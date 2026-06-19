@@ -1,4 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import {
   BookOpen, Bookmark, Highlighter, Sticker, Flame, Clock, BookMarked,
   Sparkles, User, LogIn, UserPlus, X, ChevronLeft, ChevronRight,
@@ -434,9 +437,35 @@ function StarRow({ value, size = 13, onChange }) {
   );
 }
 
-function BookSpine({ book, t, lang, onOpen }) {
+function BookSpine({ book, t, lang, onOpen, compact = false }) {
   const pct = book.totalPages ? Math.round((book.page / book.totalPages) * 100) : 0;
   const hasCover = !!book.cover;
+
+  if (compact) {
+    return (
+      <button onClick={() => onOpen(book)} className="text-left group block w-full" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+        <div className="relative rounded-lg overflow-hidden transition-transform group-hover:-translate-y-1.5"
+          style={{
+            background: hasCover ? `url(${book.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${book.color}cc, ${book.color}99)`,
+            height: 164, boxShadow: "0 10px 18px -8px rgba(0,0,0,0.6)",
+          }}>
+          {!hasCover && (
+            <div className="absolute inset-0 flex items-center justify-center p-3">
+              <span style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 13, textAlign: "center", lineHeight: 1.3 }}>{book.title}</span>
+            </div>
+          )}
+          {book.status === "reading" && (
+            <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: "#00000033" }}>
+              <div className="h-1" style={{ width: `${pct}%`, background: "#FFB199" }} />
+            </div>
+          )}
+        </div>
+        <p style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11.5, marginTop: 6, lineHeight: 1.3 }} className="line-clamp-2">{book.title}</p>
+        {book.rating > 0 && <div className="mt-1"><StarRow value={book.rating} size={11} /></div>}
+      </button>
+    );
+  }
+
   return (
     <button onClick={() => onOpen(book)} className="text-left group" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
       <div className="relative rounded-xl p-4 h-full flex flex-col justify-between transition-transform group-hover:-translate-y-1 overflow-hidden"
@@ -569,46 +598,70 @@ function Field({ label, value, onChange, type = "text" }) {
 // ---------------------------------------------------------------
 // Reader (page view with pen / sticker / bookmark)
 // ---------------------------------------------------------------
-const PAGE_TEXT = {
-  en: "The lantern light fell soft across the page, and for a moment the room beyond the page ceased to exist. There was only the next sentence, and the one after it, each a step further into the quiet dark of the story — a cave with no end, only deeper rooms, each warmer than the last, each holding something the reader did not know they were looking for until they found it, turned it over once in the lamplight, and kept walking.",
-  ar: "سقط ضوء الفانوس ناعماً على الصفحة، وللحظة توقفت الغرفة خلف الصفحة عن الوجود. لم يكن هناك سوى الجملة التالية، ثم التي تليها، كل واحدة خطوة أعمق في عتمة القصة الهادئة — كهفٌ بلا نهاية، غرفٌ أعمق فقط، كل واحدة أدفأ من سابقتها، تحمل شيئاً لم يكن القارئ يعلم أنه يبحث عنه حتى وجده، قلّبه مرة في ضوء المصباح، ثم واصل السير.",
+const PAGE_TEXTS = {
+  en: [
+    "The lantern light fell soft across the page, and for a moment the room beyond the page ceased to exist. There was only the next sentence, and the one after it, each a step further into the quiet dark of the story.",
+    "A cave with no end, only deeper rooms, each warmer than the last, each holding something the reader did not know they were looking for until they found it, turned it over once in the lamplight, and kept walking.",
+    "Somewhere behind the words a door was always closing softly, and another opening just as quietly — the story breathing in time with the reader's own held breath.",
+    "Pages turned like tides, pulling the room further from the world outside, until the only sound left was the rustle of paper and the low hum of the lantern's flame.",
+  ],
+  ar: [
+    "سقط ضوء الفانوس ناعماً على الصفحة، وللحظة توقفت الغرفة خلف الصفحة عن الوجود. لم يكن هناك سوى الجملة التالية، ثم التي تليها، كل واحدة خطوة أعمق في عتمة القصة الهادئة.",
+    "كهفٌ بلا نهاية، غرفٌ أعمق فقط، كل واحدة أدفأ من سابقتها، تحمل شيئاً لم يكن القارئ يعلم أنه يبحث عنه حتى وجده، قلّبه مرة في ضوء المصباح، ثم واصل السير.",
+    "خلف الكلمات، باب يُغلق بهدوء دائماً، وآخر يُفتح بالهدوء نفسه — القصة تتنفس بإيقاع أنفاس القارئ المحبوسة.",
+    "تتقلب الصفحات كالمد، تسحب الغرفة أبعد عن العالم الخارجي، حتى لا يبقى صوت سوى حفيف الورق وأزيز شعلة الفانوس الخافت.",
+  ],
 };
 
 const STICKERS = ["⭐", "🔖", "❤️", "🪶", "🕯️"];
 const HL_COLORS = ["#FFB19988", "#A78BFA66", "#7C8CFF77", "#F472B666"];
 
-function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta }) {
+function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdateBookmark }) {
   const [tool, setTool] = useState(null); // 'pen' | 'sticker' | 'bookmark'
   const [hlColor, setHlColor] = useState(HL_COLORS[0]);
   const [highlights, setHighlights] = useState([]);
   const [stickers, setStickers] = useState([]);
-  const [bookmarkPage, setBookmarkPage] = useState(book.bookmark || null);
-  const [selection, setSelection] = useState("");
   const [ratingDraft, setRatingDraft] = useState(book.rating || 0);
   const [reviewDraft, setReviewDraft] = useState(book.review || "");
+  const [justBookmarked, setJustBookmarked] = useState(false);
   const containerRef = useRef(null);
+  const bookmarkPage = book.bookmark;
 
-  const handleMouseUp = () => {
+  const captureHighlight = () => {
     if (tool !== "pen") return;
     const sel = window.getSelection();
-    if (sel && sel.toString().trim().length > 0) {
-      setSelection(sel.toString());
-      setHighlights((h) => [...h, { text: sel.toString(), color: hlColor }]);
+    const text = sel ? sel.toString().trim() : "";
+    if (text.length > 0) {
+      setHighlights((h) => [...h, { text, color: hlColor }]);
       sel.removeAllRanges();
     }
   };
+  // Touch selection on mobile needs a brief delay before the selection is final.
+  const handleTouchEnd = () => setTimeout(captureHighlight, 60);
 
-  const handleTextClick = (e) => {
+  const handlePageClick = (e) => {
     if (tool !== "sticker") return;
+    if (e.target.closest("[data-sticker]")) return; // tapping an existing sticker is handled separately
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    setStickers((s) => [...s, { x, y, emoji: STICKERS[s.length % STICKERS.length] }]);
+    setStickers((s) => [...s, { id: Date.now(), x, y, emoji: STICKERS[s.length % STICKERS.length] }]);
+  };
+
+  const removeSticker = (id, e) => {
+    e.stopPropagation();
+    setStickers((s) => s.filter((st) => st.id !== id));
   };
 
   const setBookmark = () => {
-    setBookmarkPage(book.page);
+    onUpdateBookmark(book.page);
+    setJustBookmarked(true);
+    setTimeout(() => setJustBookmarked(false), 1500);
   };
+
+  const pageTextIndex = book.page % PAGE_TEXTS[lang].length;
+  const atFirstPage = book.page <= 0;
+  const atLastPage = book.page >= book.totalPages;
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #211C3D 0%, #3B2F66 55%, #6B4C72 100%)", backgroundAttachment: "fixed" }}>
@@ -623,7 +676,7 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta }) {
             <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13 }}>{t.page} {book.page} {t.of} {book.totalPages}</p>
           </div>
           {bookmarkPage != null && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: "#A78BFA22", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12 }}>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: justBookmarked ? "#FFB19944" : "#A78BFA22", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12, transition: "background 0.3s" }}>
               <Bookmark size={13} /> {t.bookmarkSet} {bookmarkPage}
             </div>
           )}
@@ -643,20 +696,34 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta }) {
             </div>
           )}
         </div>
+        {tool === "pen" && (
+          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11.5, marginBottom: 8 }}>
+            {lang === "ar" ? "اسحب إصبعك فوق النص لتحديده." : "Drag your finger over the text to select it."}
+          </p>
+        )}
+        {tool === "sticker" && (
+          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11.5, marginBottom: 8 }}>
+            {lang === "ar" ? "اضغط على الصفحة لإضافة ستيكر، واضغط على ستيكر موجود لحذفه." : "Tap the page to place a sticker, tap a sticker to remove it."}
+          </p>
+        )}
 
         {/* Page */}
         <div
           ref={containerRef}
-          onMouseUp={handleMouseUp}
-          onClick={handleTextClick}
+          onMouseUp={captureHighlight}
+          onTouchEnd={handleTouchEnd}
+          onClick={handlePageClick}
           className="relative rounded-3xl p-8 md:p-12"
           style={{ background: "#F4F0FF", minHeight: 380, cursor: tool === "sticker" ? "crosshair" : "text" }}
         >
           <p style={{ fontFamily: "Amiri, serif", color: "#2A2350", fontSize: 19, lineHeight: 2, textAlign: lang === "ar" ? "right" : "left" }}>
-            {PAGE_TEXT[lang]}
+            {PAGE_TEXTS[lang][pageTextIndex]}
           </p>
-          {stickers.map((s, i) => (
-            <span key={i} style={{ position: "absolute", left: s.x - 10, top: s.y - 10, fontSize: 20 }}>{s.emoji}</span>
+          {stickers.map((s) => (
+            <span key={s.id} data-sticker onClick={(e) => removeSticker(s.id, e)}
+              style={{ position: "absolute", left: s.x - 12, top: s.y - 12, fontSize: 22, cursor: "pointer" }}>
+              {s.emoji}
+            </span>
           ))}
         </div>
 
@@ -675,10 +742,18 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta }) {
 
         {/* page nav */}
         <div className="flex items-center justify-between mt-6">
-          <button onClick={() => onUpdatePage(Math.max(0, book.page - 1))} className="px-4 py-2 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 13 }}>
+          <button
+            disabled={atFirstPage}
+            onClick={() => onUpdatePage(Math.max(0, book.page - 10))}
+            className="px-4 py-2 rounded-full"
+            style={{ background: "rgba(255,255,255,0.06)", color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 13, opacity: atFirstPage ? 0.4 : 1, cursor: atFirstPage ? "not-allowed" : "pointer" }}>
             {lang === "ar" ? "→ السابقة" : "← Prev"}
           </button>
-          <button onClick={() => onUpdatePage(Math.min(book.totalPages, book.page + 1))} className="px-4 py-2 rounded-full" style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 13 }}>
+          <button
+            disabled={atLastPage}
+            onClick={() => onUpdatePage(Math.min(book.totalPages, book.page + 10))}
+            className="px-4 py-2 rounded-full"
+            style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 13, opacity: atLastPage ? 0.5 : 1, cursor: atLastPage ? "not-allowed" : "pointer" }}>
             {lang === "ar" ? "التالية ←" : "Next →"}
           </button>
         </div>
@@ -729,8 +804,6 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
   // Renders page 1 of a PDF onto a canvas and returns a data-URL image —
   // this becomes the book's real cover, taken straight from the file.
   const coverFromPdf = async (file) => {
-    const pdfjsLib = await import("https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.mjs";
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const page = await pdf.getPage(1);
@@ -1018,6 +1091,11 @@ export default function KahfAlKutub() {
             setOpenBook((ob) => ({ ...ob, rating, review }));
             persistBook(openBook.id, { rating, review });
           }}
+          onUpdateBookmark={(page) => {
+            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, bookmark: page } : b)));
+            setOpenBook((ob) => ({ ...ob, bookmark: page }));
+            persistBook(openBook.id, { bookmark: page });
+          }}
         />
       </div>
     );
@@ -1122,41 +1200,134 @@ export default function KahfAlKutub() {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <StatCard icon={Clock} label={t.hoursRead} value={totalHours} />
               <StatCard icon={BookMarked} label={t.booksFinished} value={finishedCount} />
               <StatCard icon={BookOpen} label={t.wordsRead} value={totalWords.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} />
               <StatCard icon={Flame} label={t.streak} value={9} sub={lang === "ar" ? "أيام متتالية" : "consecutive days"} />
             </div>
 
-            <div className="grid lg:grid-cols-3 gap-6">
+            {/* Currently reading gallery + goal donut */}
+            <div className="grid lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
-                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 18 }}>{t.weeklyActivity}</h3>
-                <div className="flex items-end justify-between gap-2" style={{ height: 140 }}>
-                  {weekData.map((d, i) => (
-                    <div key={i} className="flex flex-col items-center gap-2 flex-1">
-                      <div className="w-full rounded-t-lg" style={{ height: `${(d.v / maxWeek) * 100}%`, minHeight: 4, background: "linear-gradient(180deg,#FFB199,#A78BFA)" }} />
-                      <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11 }}>{d.day}</span>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.currentlyReading}</h3>
+                {books.filter((b) => b.status === "reading").length === 0 ? (
+                  <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 13 }}>{t.emptyShelf}</p>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {books.filter((b) => b.status === "reading").map((b) => (
+                      <button key={b.id} onClick={() => setOpenBook(b)} className="shrink-0 w-28 text-left" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+                        <div className="rounded-lg overflow-hidden" style={{
+                          height: 110, background: b.cover ? `url(${b.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${b.color}cc, ${b.color}99)`,
+                        }} />
+                        <p style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11.5, marginTop: 6, lineHeight: 1.3 }} className="line-clamp-2">{b.title}</p>
+                        <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 10.5 }}>{t.page} {b.page}/{b.totalPages}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl p-6 flex flex-col items-center justify-center" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 14, marginBottom: 14, alignSelf: lang === "ar" ? "flex-end" : "flex-start" }}>
+                  {lang === "ar" ? "هدف القراءة" : "Reading Goal"}
+                </h3>
+                <div className="relative flex items-center justify-center" style={{ width: 130, height: 130 }}>
+                  <div style={{
+                    width: 130, height: 130, borderRadius: "50%",
+                    background: `conic-gradient(#FFB199 ${Math.min(100, (finishedCount / 12) * 100)}%, rgba(255,255,255,0.1) 0)`,
+                  }} />
+                  <div className="absolute flex flex-col items-center justify-center rounded-full" style={{ width: 98, height: 98, background: "#2D2A57" }}>
+                    <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 22, fontWeight: 700 }}>{finishedCount}/12</span>
+                    <span style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 10.5 }}>{t.booksRead}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Reading log + favorite quotes */}
+            <div className="grid lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 rounded-2xl p-6 overflow-x-auto" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>
+                  {lang === "ar" ? "سجل القراءة" : "Reading Log"}
+                </h3>
+                <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
+                      {[t.title, t.author === "by" || t.author === "بقلم" ? (lang === "ar" ? "المؤلف" : "Author") : t.author, lang === "ar" ? "التقييم" : "Rating", lang === "ar" ? "الحالة" : "Status"].map((h, i) => (
+                        <th key={i} style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11.5, fontWeight: 500, textAlign: lang === "ar" ? "right" : "left", paddingBottom: 8 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {books.slice(0, 6).map((b) => (
+                      <tr key={b.id} onClick={() => setOpenBook(b)} className="cursor-pointer" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 12.5, padding: "9px 0" }}>{b.title}</td>
+                        <td style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>{b.author}</td>
+                        <td><StarRow value={b.rating || 0} size={11} /></td>
+                        <td style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 11.5 }}>
+                          {b.status === "finished" ? t.finished : b.status === "reading" ? t.currentlyReading : t.wantToRead}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <QuoteIcon size={14} color="#FFB199" />
+                  <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 14 }}>{t.quotes}</h3>
+                </div>
+                <div className="space-y-4">
+                  {QUOTES.slice(0, 2).map((q, i) => (
+                    <div key={i}>
+                      <p style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 14.5, lineHeight: 1.6 }}>“{q[lang]}”</p>
+                      <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11, marginTop: 4 }}>— {q.by}</p>
                     </div>
                   ))}
                 </div>
               </div>
+            </div>
 
-              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
-                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>{t.topGenres}</h3>
-                <div className="space-y-3">
-                  {genreCounts.map(([g, count], i) => (
-                    <div key={g}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 13 }}>{GENRES[lang][g]}</span>
-                        <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>{count} {t.booksRead}</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
-                        <div className="h-1.5 rounded-full" style={{ width: `${(count / books.length) * 100}%`, background: SPINE_COLORS[i % SPINE_COLORS.length] }} />
-                      </div>
+            {/* Reading tracker heatmap */}
+            <div className="rounded-2xl p-6 mb-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+              <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.weeklyActivity}</h3>
+              <div className="flex items-end justify-between gap-2 mb-3" style={{ height: 110 }}>
+                {weekData.map((d, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2 flex-1">
+                    <div className="w-full rounded-t-lg" style={{ height: `${(d.v / maxWeek) * 100}%`, minHeight: 4, background: "linear-gradient(180deg,#FFB199,#A78BFA)" }} />
+                    <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11 }}>{d.day}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {weekData.map((d, i) => {
+                  const intensity = d.v / maxWeek;
+                  return (
+                    <div key={i} className="flex-1 rounded-md" style={{
+                      height: 14,
+                      background: intensity === 0 ? "rgba(255,255,255,0.06)" : `rgba(255,178,153,${0.25 + intensity * 0.65})`,
+                    }} title={`${d.v} ${lang === "ar" ? "دقيقة" : "min"}`} />
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+              <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>{t.topGenres}</h3>
+              <div className="space-y-3">
+                {genreCounts.map(([g, count], i) => (
+                  <div key={g}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 13 }}>{GENRES[lang][g]}</span>
+                      <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>{count} {t.booksRead}</span>
                     </div>
-                  ))}
-                </div>
+                    <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
+                      <div className="h-1.5 rounded-full" style={{ width: `${(count / books.length) * 100}%`, background: SPINE_COLORS[i % SPINE_COLORS.length] }} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -1203,10 +1374,22 @@ function NavBtn({ icon: Icon, label, active, onClick }) {
 
 function ShelfRow({ label, books, t, lang, onOpen }) {
   return (
-    <div className="mb-7">
-      <h3 style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 13, fontWeight: 700, marginBottom: 10, letterSpacing: 0.5 }}>{label}</h3>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {books.map((b) => <BookSpine key={b.id} book={b} t={t} lang={lang} onOpen={onOpen} />)}
+    <div className="mb-10">
+      <h3 style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 13, fontWeight: 700, marginBottom: 14, letterSpacing: 0.5 }}>{label}</h3>
+      <div className="relative pb-5">
+        <div className="flex gap-4 overflow-x-auto pb-3 px-1" style={{ scrollbarWidth: "thin" }}>
+          {books.map((b) => (
+            <div key={b.id} className="shrink-0" style={{ width: 116 }}>
+              <BookSpine book={b} t={t} lang={lang} onOpen={onOpen} compact />
+            </div>
+          ))}
+        </div>
+        {/* wooden shelf ledge */}
+        <div className="absolute left-0 right-0 bottom-0 rounded-full" style={{
+          height: 10,
+          background: "linear-gradient(180deg, #C9A06B 0%, #8B6A42 60%, #5E4429 100%)",
+          boxShadow: "0 8px 14px -4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.25) inset",
+        }} />
       </div>
     </div>
   );
