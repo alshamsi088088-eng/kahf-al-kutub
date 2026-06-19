@@ -415,17 +415,43 @@ function StatCard({ icon: Icon, label, value, sub }) {
   );
 }
 
+function StarRow({ value, size = 13, onChange }) {
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      {stars.map((s) => (
+        <button
+          key={s}
+          type="button"
+          disabled={!onChange}
+          onClick={() => onChange && onChange(s)}
+          style={{ cursor: onChange ? "pointer" : "default", lineHeight: 0 }}
+        >
+          <Star size={size} color="#FFD9CE" fill={s <= value ? "#FFB199" : "transparent"} strokeWidth={1.5} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function BookSpine({ book, t, lang, onOpen }) {
   const pct = book.totalPages ? Math.round((book.page / book.totalPages) * 100) : 0;
+  const hasCover = !!book.cover;
   return (
     <button onClick={() => onOpen(book)} className="text-left group" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
-      <div className="rounded-xl p-4 h-full flex flex-col justify-between transition-transform group-hover:-translate-y-1"
-        style={{ background: `linear-gradient(160deg, ${book.color}cc, ${book.color}99)`, minHeight: 150, boxShadow: "0 8px 20px -10px rgba(0,0,0,0.6)" }}>
-        <div>
-          <div style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 16, lineHeight: 1.35 }}>{book.title}</div>
-          <div style={{ fontFamily: "Tajawal", color: "#F4F0FFcc", fontSize: 12, marginTop: 4, opacity: 0.85 }}>{t.author} {book.author}</div>
+      <div className="relative rounded-xl p-4 h-full flex flex-col justify-between transition-transform group-hover:-translate-y-1 overflow-hidden"
+        style={{
+          background: hasCover ? `url(${book.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${book.color}cc, ${book.color}99)`,
+          minHeight: 150, boxShadow: "0 8px 20px -10px rgba(0,0,0,0.6)"
+        }}>
+        {hasCover && (
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(20,15,40,0.15) 0%, rgba(20,15,40,0.75) 100%)" }} />
+        )}
+        <div className="relative">
+          <div style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 16, lineHeight: 1.35, textShadow: hasCover ? "0 1px 6px rgba(0,0,0,0.6)" : "none" }}>{book.title}</div>
+          <div style={{ fontFamily: "Tajawal", color: "#F4F0FFcc", fontSize: 12, marginTop: 4, opacity: 0.9 }}>{t.author} {book.author}</div>
         </div>
-        <div>
+        <div className="relative">
           {book.status !== "want" && (
             <div className="mt-3">
               <div className="w-full h-1.5 rounded-full" style={{ background: "#00000033" }}>
@@ -436,6 +462,9 @@ function BookSpine({ book, t, lang, onOpen }) {
           )}
           {book.status === "want" && (
             <div style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11, marginTop: 3, opacity: 0.8 }}>{t.wantToRead}</div>
+          )}
+          {book.rating > 0 && (
+            <div className="mt-2"><StarRow value={book.rating} size={12} /></div>
           )}
         </div>
       </div>
@@ -548,13 +577,15 @@ const PAGE_TEXT = {
 const STICKERS = ["⭐", "🔖", "❤️", "🪶", "🕯️"];
 const HL_COLORS = ["#FFB19988", "#A78BFA66", "#7C8CFF77", "#F472B666"];
 
-function ReaderView({ book, t, lang, onBack, onUpdatePage }) {
+function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta }) {
   const [tool, setTool] = useState(null); // 'pen' | 'sticker' | 'bookmark'
   const [hlColor, setHlColor] = useState(HL_COLORS[0]);
   const [highlights, setHighlights] = useState([]);
   const [stickers, setStickers] = useState([]);
   const [bookmarkPage, setBookmarkPage] = useState(book.bookmark || null);
   const [selection, setSelection] = useState("");
+  const [ratingDraft, setRatingDraft] = useState(book.rating || 0);
+  const [reviewDraft, setReviewDraft] = useState(book.review || "");
   const containerRef = useRef(null);
 
   const handleMouseUp = () => {
@@ -621,7 +652,7 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage }) {
           className="relative rounded-3xl p-8 md:p-12"
           style={{ background: "#F4F0FF", minHeight: 380, cursor: tool === "sticker" ? "crosshair" : "text" }}
         >
-          <p style={{ fontFamily: "Amiri, serif", color: "rgba(255,255,255,0.08)", fontSize: 19, lineHeight: 2, textAlign: lang === "ar" ? "right" : "left" }}>
+          <p style={{ fontFamily: "Amiri, serif", color: "#2A2350", fontSize: 19, lineHeight: 2, textAlign: lang === "ar" ? "right" : "left" }}>
             {PAGE_TEXT[lang]}
           </p>
           {stickers.map((s, i) => (
@@ -634,7 +665,7 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage }) {
             <h3 style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t.recentHighlights}</h3>
             <div className="space-y-2">
               {highlights.map((h, i) => (
-                <div key={i} className="px-3 py-2 rounded-lg" style={{ background: h.color, color: "rgba(255,255,255,0.08)", fontFamily: "Tajawal", fontSize: 13 }}>
+                <div key={i} className="px-3 py-2 rounded-lg" style={{ background: h.color, color: "#2A2350", fontFamily: "Tajawal", fontSize: 13 }}>
                   “{h.text}”
                 </div>
               ))}
@@ -650,6 +681,27 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage }) {
           <button onClick={() => onUpdatePage(Math.min(book.totalPages, book.page + 1))} className="px-4 py-2 rounded-full" style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 13 }}>
             {lang === "ar" ? "التالية ←" : "Next →"}
           </button>
+        </div>
+
+        {/* Rating & review — appears right under the book */}
+        <div className="mt-8 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+          <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+            {lang === "ar" ? "تقييمي للكتاب" : "My rating"}
+          </h3>
+          <StarRow value={ratingDraft} size={24} onChange={(v) => { setRatingDraft(v); onUpdateMeta(v, reviewDraft); }} />
+
+          <h4 style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontWeight: 600, fontSize: 12.5, marginTop: 18, marginBottom: 6 }}>
+            {lang === "ar" ? "تعليقي" : "My comment"}
+          </h4>
+          <textarea
+            value={reviewDraft}
+            onChange={(e) => setReviewDraft(e.target.value)}
+            onBlur={() => onUpdateMeta(ratingDraft, reviewDraft)}
+            placeholder={lang === "ar" ? "اكتب رأيك أو انطباعك عن الكتاب…" : "Write your thoughts about this book…"}
+            rows={3}
+            className="w-full px-3.5 py-3 rounded-xl outline-none resize-none"
+            style={{ background: "#211C3D", border: "1px solid rgba(255,255,255,0.18)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 13.5 }}
+          />
         </div>
       </div>
     </div>
@@ -669,14 +721,117 @@ function ToolBtn({ icon: Icon, active, label, onClick }) {
 // Add Book Modal
 // ---------------------------------------------------------------
 function AddBookModal({ t, lang, onClose, onAdd }) {
-  const [form, setForm] = useState({ title: "", author: "", genre: "novel", totalPages: 200, color: SPINE_COLORS[0] });
+  const [form, setForm] = useState({ title: "", author: "", genre: "novel", totalPages: 200, color: SPINE_COLORS[0], cover: null, fileName: null });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileRef = useRef(null);
+
+  // Renders page 1 of a PDF onto a canvas and returns a data-URL image —
+  // this becomes the book's real cover, taken straight from the file.
+  const coverFromPdf = async (file) => {
+    const pdfjsLib = await import("https://esm.sh/pdfjs-dist@3.11.174/build/pdf.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.mjs";
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1.4 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    return { cover: canvas.toDataURL("image/jpeg", 0.9), totalPages: pdf.numPages };
+  };
+
+  // EPUBs don't expose a page to render the same way — instead we paint a
+  // clean generated cover using the book's own title, so it's still unique
+  // to that file rather than a generic placeholder.
+  const coverFromTitle = (title, color) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400; canvas.height = 560;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 400, 560);
+    grad.addColorStop(0, color); grad.addColorStop(1, "#241F45");
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 400, 560);
+    ctx.fillStyle = "#F4F0FF"; ctx.font = "bold 32px Georgia, serif"; ctx.textAlign = "center";
+    const words = (title || "Book").split(" ");
+    let line = "", y = 250, lines = [];
+    words.forEach((w) => {
+      const test = line + w + " ";
+      if (ctx.measureText(test).width > 320 && line) { lines.push(line); line = w + " "; }
+      else line = test;
+    });
+    lines.push(line);
+    lines.slice(0, 5).forEach((l, i) => ctx.fillText(l.trim(), 200, y + i * 42));
+    return canvas.toDataURL("image/jpeg", 0.9);
+  };
+
+  const handleBookFile = async (file) => {
+    if (!file) return;
+    setUploadError("");
+    setUploading(true);
+    try {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const niceTitle = form.title || file.name.replace(/\.(pdf|epub)$/i, "");
+      let cover, totalPages = form.totalPages;
+      if (isPdf) {
+        const result = await coverFromPdf(file);
+        cover = result.cover;
+        totalPages = result.totalPages || totalPages;
+      } else {
+        cover = coverFromTitle(niceTitle, form.color);
+      }
+      setForm((f) => ({ ...f, cover, fileName: file.name, title: f.title || niceTitle, totalPages }));
+    } catch (e) {
+      setUploadError(lang === "ar" ? "تعذّر استخراج الغلاف من الملف، جرّب ملف آخر." : "Couldn't extract a cover from this file — try another one.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "#00000099" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
         <div className="flex items-center justify-between mb-4">
           <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 17 }}>{t.addBook}</h3>
           <button onClick={onClose}><X size={18} color="#B6ACD6" /></button>
         </div>
+
+        {/* Upload the actual book — cover is generated automatically */}
+        <div className="mb-4">
+          <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.uploadBook}</label>
+          <input ref={fileRef} type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" className="hidden" onChange={(e) => handleBookFile(e.target.files?.[0])} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="w-full rounded-xl overflow-hidden relative flex items-center justify-center"
+            style={{ background: form.cover ? `url(${form.cover}) center/cover no-repeat` : "#211C3D", border: "1px dashed rgba(255,255,255,0.25)", height: form.cover ? 160 : 80 }}
+          >
+            {!form.cover && (
+              <div className="flex flex-col items-center gap-1.5">
+                <Upload size={18} color="#B6ACD6" />
+                <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>
+                  {uploading
+                    ? (lang === "ar" ? "جارٍ استخراج الغلاف…" : "Extracting cover…")
+                    : (lang === "ar" ? `اضغط لرفع كتاب (pdf / epub.)` : "Tap to upload a book (.pdf / .epub)")}
+                </span>
+              </div>
+            )}
+            {form.cover && (
+              <div className="absolute bottom-1.5 inset-x-1.5 flex justify-between items-center">
+                <span className="px-2 py-1 rounded-full truncate max-w-[60%]" style={{ background: "rgba(20,15,40,0.7)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 10.5 }}>
+                  {form.fileName}
+                </span>
+                <span className="px-2 py-1 rounded-full" style={{ background: "rgba(20,15,40,0.7)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 11 }}>
+                  {lang === "ar" ? "تغيير" : "Change"}
+                </span>
+              </div>
+            )}
+          </button>
+          {uploadError && (
+            <p style={{ fontFamily: "Tajawal", color: "#FB7185", fontSize: 11.5, marginTop: 6 }}>{uploadError}</p>
+          )}
+        </div>
+
         <Field label={t.title} value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
         <Field label={t.author} value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
         <div className="mb-4">
@@ -687,24 +842,24 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
           </select>
         </div>
         <Field label={t.totalPagesField} value={form.totalPages} onChange={(v) => setForm({ ...form, totalPages: v })} type="number" />
-        <div className="mb-5">
-          <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.coverColor}</label>
-          <div className="flex gap-2">
-            {SPINE_COLORS.map((c) => (
-              <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-full"
-                style={{ background: c, outline: form.color === c ? "2px solid #FFB199" : "none", outlineOffset: 2 }} />
-            ))}
+
+        {!form.cover && (
+          <div className="mb-5">
+            <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.coverColor}</label>
+            <div className="flex gap-2">
+              {SPINE_COLORS.map((c) => (
+                <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-full"
+                  style={{ background: c, outline: form.color === c ? "2px solid #FFB199" : "none", outlineOffset: 2 }} />
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 mb-3 px-3 py-2.5 rounded-xl" style={{ background: "#211C3D", border: "1px dashed rgba(255,255,255,0.18)" }}>
-          <Upload size={15} color="#B6ACD6" />
-          <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5 }}>{t.uploadBook} (.pdf / .epub)</span>
-        </div>
+        )}
+
         <button
-          disabled={!form.title}
+          disabled={!form.title || uploading}
           onClick={() => { onAdd(form); onClose(); }}
           className="w-full py-3 rounded-xl"
-          style={{ background: form.title ? "linear-gradient(180deg,#FFB199,#A78BFA)" : "rgba(255,255,255,0.18)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, opacity: form.title ? 1 : 0.6 }}>
+          style={{ background: form.title ? "linear-gradient(180deg,#FFB199,#A78BFA)" : "rgba(255,255,255,0.18)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, opacity: form.title && !uploading ? 1 : 0.6 }}>
           {t.create}
         </button>
       </div>
@@ -720,11 +875,13 @@ const rowToBook = (r) => ({
   id: r.id, title: r.title, author: r.author || "", genre: r.genre,
   totalPages: r.total_pages, page: r.page, status: r.status, color: r.color,
   words: r.words, sessions: r.sessions || [0,0,0,0,0,0,0], bookmark: r.bookmark,
+  cover: r.cover_url || null, rating: r.rating || 0, review: r.review || "",
 });
 const bookToInsertRow = (b) => ({
   title: b.title, author: b.author || "", genre: b.genre, total_pages: b.totalPages,
   page: b.page || 0, status: b.status || "want", color: b.color, words: b.words || 0,
-  sessions: b.sessions || [0,0,0,0,0,0,0],
+  sessions: b.sessions || [0,0,0,0,0,0,0], cover_url: b.cover || null,
+  rating: b.rating || 0, review: b.review || "",
 });
 
 export default function KahfAlKutub() {
@@ -794,6 +951,7 @@ export default function KahfAlKutub() {
       status: "want",
       color: form.color,
       words: 0,
+      cover: form.cover || null,
     });
     setSaveState("saving");
     try {
@@ -855,6 +1013,11 @@ export default function KahfAlKutub() {
             setOpenBook((ob) => ({ ...ob, page: p }));
             persistBook(openBook.id, { page: p, status });
           }}
+          onUpdateMeta={(rating, review) => {
+            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, rating, review } : b)));
+            setOpenBook((ob) => ({ ...ob, rating, review }));
+            persistBook(openBook.id, { rating, review });
+          }}
         />
       </div>
     );
@@ -903,10 +1066,10 @@ export default function KahfAlKutub() {
       <div className="max-w-6xl mx-auto px-5 py-8">
         {view === "library" && (
           <>
-            <StoneArchHero t={t} lang={lang} onEnter={() => {}} />
+            <StoneArchHero t={t} lang={lang} onEnter={() => document.getElementById("shelf-section")?.scrollIntoView({ behavior: "smooth" })} />
 
             <div className="grid lg:grid-cols-3 gap-6 mt-8">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2" id="shelf-section">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
                   <h2 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 24, fontWeight: 700 }}>{t.myShelf}</h2>
                   <div className="flex items-center gap-2">
