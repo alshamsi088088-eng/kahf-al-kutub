@@ -1,8 +1,20 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import * as pdfjsLib from "pdfjs-dist";
-import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+
+// تعيين الـ Worker باستخدام رابط CDN مباشر لتفادي مشاكل البناء في Vercel
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '3.11.174'}/build/pdf.worker.min.mjs`;
+
 import {
+  BookOpen, Bookmark, Highlighter, Sticker, Flame, Clock, BookMarked,
+  Sparkles, User, LogIn, UserPlus, X, ChevronLeft, ChevronRight,
+  Globe, LayoutDashboard, Library, Plus, Search, Star, TrendingUp,
+  Quote as QuoteIcon, Award, Upload, AlertCircle
+} from "lucide-react";
+
+// ----------------------------------------------------------------
+// Supabase connection (real backend — Postgres + Auth)
+// ----------------------------------------------------------------
+
   BookOpen, Bookmark, Highlighter, Sticker, Flame, Clock, BookMarked,
   Sparkles, User, LogIn, UserPlus, X, ChevronLeft, ChevronRight,
   Globe, LayoutDashboard, Library, Plus, Search, Star, TrendingUp,
