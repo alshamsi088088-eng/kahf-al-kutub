@@ -1,22 +1,25 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 
-// تعيين الـ Worker الخاص بالـ PDF
+// تعيين الـ Worker باستخدام رابط CDN مباشر لتفادي مشاكل البناء في Vercel
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version || '3.11.174'}/build/pdf.worker.min.mjs`;
 
 import {
   BookOpen, Bookmark, Highlighter, Sticker, Flame, Clock, BookMarked,
   Sparkles, User, LogIn, UserPlus, X, ChevronLeft, ChevronRight,
   Globe, LayoutDashboard, Library, Plus, Search, Star, TrendingUp,
-  Quote as QuoteIcon, Award, Upload, AlertCircle, Trash2
+  Quote as QuoteIcon, Award, Upload, AlertCircle
 } from "lucide-react";
 
 const FONT_IMPORTS = `
 @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700&display=swap');
 * { box-sizing: border-box; }
-body { margin: 0; background-color: #1a162b; }
+body { margin: 0; }
 `;
 
+// ----------------------------------------------------------------
+// Supabase connection (real backend — Postgres + Auth)
+// ----------------------------------------------------------------
 const SUPABASE_URL = "https://abpgyqyghhydinhfuzgt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicGd5cXlnaGh5ZGluaGZ1emd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDg0OTYsImV4cCI6MjA5NzM4NDQ5Nn0.ANO_WnOLNi2PuxXBZsTAlsqAUnYhMRCCfoRml5FWcSI";
 
@@ -78,58 +81,330 @@ const sb = {
   },
 };
 
+// ---------------------------------------------------------------
+// i18n & Static Data
+// ---------------------------------------------------------------
 const STR = {
   en: {
-    dir: "ltr", appName: "Kahf Al-Kutub", tagline: "The Cave of Books",
+    dir: "ltr",
+    appName: "Kahf Al-Kutub",
+    tagline: "The Cave of Books",
     heroTitle: "A quiet cave for everything you read",
     heroSub: "Carry your shelf, your bookmarks, your ink, and your streak — into one warm little cave.",
-    getStarted: "Enter the cave", signIn: "Sign in", signUp: "Create account",
-    name: "Name", email: "Email", password: "Password", welcomeBack: "Welcome back",
-    joinCave: "Join the cave", haveAccount: "Already have an account?", noAccount: "New here?",
-    library: "Library", dashboard: "Dashboard", reading: "Reading", quotes: "Quotes",
-    profile: "Profile", logout: "Log out", myShelf: "My Bookshelf", addBook: "Add a book",
-    uploadBook: "Upload (PDF / EPUB)", searchShelf: "Search your shelf…",
-    continueReading: "Continue reading", currentlyReading: "Currently reading",
-    finished: "Finished", wantToRead: "Want to read", pages: "pages", page: "page", of: "of",
-    progress: "progress", readerOfWeek: "Reader of the Week", dailyQuote: "Today's Quote",
-    streak: "day streak", hoursRead: "Hours read", booksFinished: "Books finished",
-    recentHighlights: "Recent highlights", achievements: "Lantern badges",
-    tools: "Tools", pen: "Pen — Highlight", sticker: "Sticker", bookmarkTool: "Bookmark",
-    save: "Save", cancel: "Cancel", backToShelf: "Back to shelf", genre: "Genre", author: "by",
-    emptyShelf: "Your shelf is empty. Add your first book to light the cave.", title: "Title",
-    coverColor: "Spine color", totalPagesField: "Total pages", create: "Add to shelf", close: "Close"
+    getStarted: "Enter the cave",
+    signIn: "Sign in",
+    signUp: "Create account",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    welcomeBack: "Welcome back",
+    joinCave: "Join the cave",
+    haveAccount: "Already have an account?",
+    noAccount: "New here?",
+    library: "Library",
+    dashboard: "Dashboard",
+    reading: "Reading",
+    quotes: "Quotes",
+    profile: "Profile",
+    logout: "Log out",
+    myShelf: "My Shelf",
+    addBook: "Add a book",
+    uploadBook: "Upload a book",
+    searchShelf: "Search your shelf…",
+    continueReading: "Continue reading",
+    currentlyReading: "Currently reading",
+    finished: "Finished",
+    wantToRead: "Want to read",
+    pages: "pages",
+    page: "page",
+    of: "of",
+    progress: "progress",
+    readerOfWeek: "Reader of the Week",
+    dailyQuote: "Today's Quote",
+    newQuoteIn: "A new spark tomorrow",
+    streak: "day streak",
+    hoursRead: "Hours read",
+    booksFinished: "Books finished",
+    wordsRead: "Words read",
+    topGenres: "Most-read genres",
+    weeklyActivity: "This week's reading",
+    recentHighlights: "Recent highlights",
+    achievements: "Lantern badges",
+    bookmarkSet: "Bookmark set on page",
+    tools: "Tools",
+    pen: "Pen — highlight",
+    sticker: "Sticker",
+    bookmarkTool: "Bookmark",
+    note: "Note",
+    save: "Save",
+    cancel: "Cancel",
+    pickColor: "Pick a color",
+    addHighlight: "Add highlight",
+    yourNote: "Your note…",
+    backToShelf: "Back to shelf",
+    genre: "Genre",
+    author: "by",
+    minutesToday: "minutes today",
+    keepGoing: "Keep going — every page is a step deeper into the cave.",
+    quoteCredit: "—",
+    members: "in this cave",
+    switchLang: "العربية",
+    emptyShelf: "Your shelf is empty. Add your first book to light the cave.",
+    title: "Title",
+    coverColor: "Spine color",
+    totalPagesField: "Total pages",
+    create: "Add to shelf",
+    close: "Close",
+    stats: "Your numbers",
+    rank: "Rank",
+    booksRead: "books read",
+    motivational: [
+      "One page tonight is a torch lit for tomorrow.",
+      "Readers don't finish books. Books finish readers.",
+      "Every chapter is a room deeper in the cave.",
+      "Small reading, repeated daily, becomes a library.",
+      "Your bookmark remembers what your day forgets."
+    ],
   },
   ar: {
-    dir: "rtl", appName: "كهف الكتب", tagline: "Kahf Al-Kutub",
+    dir: "rtl",
+    appName: "كهف الكتب",
+    tagline: "Kahf Al-Kutub",
     heroTitle: "كهفٌ هادئ لكل ما تقرأ",
     heroSub: "احمل رفّك، وفواصلك، وحبرك، وسلسلة أيامك — في كهفٍ دافئ واحد.",
-    getStarted: "ادخل الكهف", signIn: "تسجيل الدخول", signUp: "إنشاء حساب",
-    name: "الاسم", email: "البريد الإلكتروني", password: "كلمة المرور", welcomeBack: "أهلاً بعودتك",
-    joinCave: "انضم إلى الكهف", haveAccount: "لديك حساب بالفعل؟", noAccount: "جديد هنا؟",
-    library: "المكتبة", dashboard: "لوحتي", reading: "القراءة", quotes: "اقتباسات",
-    profile: "الملف الشخصي", logout: "تسجيل الخروج", myShelf: "رفّ الكتب", addBook: "أضف كتاباً",
-    uploadBook: "ارفع كتاباً (PDF أو EPUB)", searchShelf: "ابحث في رفّك…",
-    continueReading: "تابع القراءة", currentlyReading: "أقرأ الآن", finished: "منتهية",
-    wantToRead: "أريد قراءتها", pages: "صفحة", page: "صفحة", of: "من", progress: "التقدم",
-    readerOfWeek: "قارئ الأسبوع", dailyQuote: "اقتباس اليوم", streak: "يوم متتالي",
-    hoursRead: "ساعات القراءة", booksFinished: "كتب أنهيتها", recentHighlights: "أحدث التحديدات",
-    achievements: "أوسمة الفانوس", tools: "الأدوات", pen: "قلم — تحديد", sticker: "ستيكر",
-    bookmarkTool: "فاصلة", save: "حفظ", cancel: "إلغاء", backToShelf: "العودة للرف",
-    genre: "النوع", author: "بقلم", emptyShelf: "رفّك فارغ. أضف كتابك الأول لتضيء الكهف.",
-    title: "العنوان", coverColor: "لون الغلاف", totalPagesField: "عدد الصفحات", create: "أضف للرف", close: "إغلاق"
-  }
+    getStarted: "ادخل الكهف",
+    signIn: "تسجيل الدخول",
+    signUp: "إنشاء حساب",
+    name: "الاسم",
+    email: "البريد الإلكتروني",
+    password: "كلمة المرور",
+    welcomeBack: "أهلاً بعودتك",
+    joinCave: "انضم إلى الكهف",
+    haveAccount: "لديك حساب بالفعل؟",
+    noAccount: "جديد هنا؟",
+    library: "المكتبة",
+    dashboard: "لوحتي",
+    reading: "القراءة",
+    quotes: "اقتباسات",
+    profile: "الملف الشخصي",
+    logout: "تسجيل الخروج",
+    myShelf: "رفّي",
+    addBook: "أضف كتاباً",
+    uploadBook: "ارفع كتاباً",
+    searchShelf: "ابحث في رفّك…",
+    continueReading: "تابع القراءة",
+    currentlyReading: "أقرأ الآن",
+    finished: "منتهية",
+    wantToRead: "أريد قراءتها",
+    pages: "صفحة",
+    page: "صفحة",
+    of: "من",
+    progress: "التقدم",
+    readerOfWeek: "قارئ الأسبوع",
+    dailyQuote: "اقتباس اليوم",
+    newQuoteIn: "شرارة جديدة غداً",
+    streak: "يوم متتالي",
+    hoursRead: "ساعات القراءة",
+    booksFinished: "كتب أنهيتها",
+    wordsRead: "كلمات قرأتها",
+    topGenres: "الأنواع الأكثر قراءة",
+    weeklyActivity: "قراءة هذا الأسبوع",
+    recentHighlights: "أحدث التحديدات",
+    achievements: "أوسمة الفانوس",
+    bookmarkSet: "تم وضع فاصلة عند صفحة",
+    tools: "الأدوات",
+    pen: "القلم — تحديد",
+    sticker: "ستيكر",
+    bookmarkTool: "فاصلة",
+    note: "ملاحظة",
+    save: "حفظ",
+    cancel: "إلغاء",
+    pickColor: "اختر لوناً",
+    addHighlight: "إضافة تحديد",
+    yourNote: "اكتب ملاحظتك…",
+    backToShelf: "العودة للرف",
+    genre: "النوع",
+    author: "بقلم",
+    minutesToday: "دقيقة اليوم",
+    keepGoing: "استمر — كل صفحة خطوة أعمق في الكهف.",
+    quoteCredit: "—",
+    members: "في هذا الكهف",
+    switchLang: "English",
+    emptyShelf: "رفّك فارغ. أضف كتابك الأول لتضيء الكهف.",
+    title: "العنوان",
+    coverColor: "لون الغلاف",
+    totalPagesField: "عدد الصفحات",
+    create: "أضف للرف",
+    close: "إغلاق",
+    stats: "أرقامك",
+    rank: "الترتيب",
+    booksRead: "كتب مقروءة",
+    motivational: [
+      "صفحة واحدة الليلة شعلة تُضاء للغد.",
+      "القرّاء لا ينهون الكتب، الكتب هي من تُنهي قرّاءها.",
+      "كل فصل غرفة أعمق في الكهف.",
+      "قراءة صغيرة، مكررة يومياً، تصبح مكتبة.",
+      "فاصلتك تتذكر ما ينساه يومك."
+    ],
+  },
 };
 
-const STICKER_OPTIONS = ["⭐", "🔖", "❤️", "🪶", "💭", "👍", "🔥", "💡"];
-const HL_COLORS = ["#FFB199AA", "#A78BFA88", "#7C8CFF99", "#F472B688"];
+const QUOTES = [
+  { en: "A reader lives a thousand lives before he dies.", ar: "القارئ يعيش ألف حياة قبل أن يموت.", by: "George R.R. Martin" },
+  { en: "Once you learn to read, you will be forever free.", ar: "حين تتعلم القراءة، تصبح حراً إلى الأبد.", by: "Frederick Douglass" },
+  { en: "Books are a uniquely portable magic.", ar: "الكتب سحرٌ محمول لا مثيل له.", by: "Stephen King" },
+  { en: "There is no friend as loyal as a book.", ar: "لا صديق وفيّ كالكتاب.", by: "Ernest Hemingway" },
+  { en: "Reading is dreaming with open eyes.", ar: "القراءة حلمٌ بعينين مفتوحتين.", by: "Anonymous" },
+  { en: "I find television very educating. Every time someone turns it on, I go in the other room and read a book.", ar: "كلما رأيت أحداً يشغّل التلفاز، ذهبت إلى الغرفة الأخرى لأقرأ كتاباً.", by: "Groucho Marx" },
+  { en: "A room without books is like a body without a soul.", ar: "غرفة بلا كتب كجسدٍ بلا روح.", by: "Cicero" },
+];
+
+const todaysQuote = () => {
+  const day = new Date().getDate() + new Date().getMonth() * 31;
+  return QUOTES[day % QUOTES.length];
+};
+
+const GENRES = {
+  en: { novel: "Novels", philosophy: "Philosophy", history: "History", scifi: "Sci-Fi", selfhelp: "Self-Development", poetry: "Poetry" },
+  ar: { novel: "روايات", philosophy: "فلسفة", history: "تاريخ", scifi: "خيال علمي", selfhelp: "تطوير ذات", poetry: "شعر" },
+};
+
 const SPINE_COLORS = ["#A78BFA", "#7C8CFF", "#C084FC", "#F472B6", "#60A5FA", "#FB7185", "#9381FF"];
+
+const seedBooks = (t) => [
+  { id: "b1", title: t === "ar" ? "ألف ليلة وليلة" : "One Thousand and One Nights", author: t === "ar" ? "مؤلف مجهول" : "Anonymous", genre: "novel", totalPages: 480, page: 312, status: "reading", color: "#A78BFA", words: 96000, sessions: [40, 35, 50, 20, 60, 30, 45] },
+  { id: "b2", title: t === "ar" ? "هكذا تكلم زرادشت" : "Thus Spoke Zarathustra", author: "Friedrich Nietzsche", genre: "philosophy", totalPages: 327, page: 327, status: "finished", color: "#7C8CFF", words: 75000, sessions: [20, 0, 30, 25, 0, 40, 10] },
+  { id: "b3", title: t === "ar" ? "مقدمة ابن خلدون" : "The Muqaddimah", author: "Ibn Khaldun", genre: "history", totalPages: 540, page: 540, status: "finished", color: "#C084FC", words: 140000, sessions: [0, 30, 0, 0, 45, 0, 0] },
+  { id: "b4", title: t === "ar" ? "دلتا الزمن" : "Project Hail Mary", author: "Andy Weir", genre: "scifi", totalPages: 476, page: 120, status: "reading", color: "#60A5FA", words: 110000, sessions: [15, 20, 10, 35, 25, 0, 30] },
+  { id: "b5", title: t === "ar" ? "عادات سبع للناس الأكثر فعالية" : "7 Habits of Highly Effective People", author: "Stephen Covey", genre: "selfhelp", totalPages: 372, page: 0, status: "want", color: "#FB7185", words: 0, sessions: [0,0,0,0,0,0,0] },
+  { id: "b6", title: t === "ar" ? "ديوان المتنبي" : "Diwan of Al-Mutanabbi", author: "Al-Mutanabbi", genre: "poetry", totalPages: 210, page: 210, status: "finished", color: "#F472B6", words: 30000, sessions: [0,0,0,0,0,0,0] },
+];
+
+const READERS_OF_WEEK = {
+  en: [{ name: "Layla A.", book: "Project Hail Mary", hours: 14 }],
+  ar: [{ name: "ليلى أ.", book: "دلتا الزمن", hours: 14 }],
+};
+
+// ---------------------------------------------------------------
+// Small UI atoms
+// ---------------------------------------------------------------
+function GoldDivider() {
+  return <div style={{ height: 1, background: "linear-gradient(90deg, transparent, #FFB19988, transparent)", margin: "1.5rem 0" }} />;
+}
+
+function StoneArchHero({ t, lang, onEnter }) {
+  return (
+    <div className="relative overflow-hidden rounded-[2.5rem]" style={{
+      background: "linear-gradient(160deg, #2D2A57 0%, #4A3D78 45%, #C97B6E 100%)",
+      border: "1px solid rgba(255,255,255,0.18)",
+      minHeight: 420,
+    }}>
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: "radial-gradient(1.5px 1.5px at 20% 20%, #fff8, transparent), radial-gradient(1.5px 1.5px at 70% 15%, #fff6, transparent), radial-gradient(1px 1px at 40% 30%, #fff5, transparent), radial-gradient(1.5px 1.5px at 85% 35%, #fff7, transparent), radial-gradient(1px 1px at 10% 45%, #fff5, transparent)"
+      }} />
+      <div className="grid md:grid-cols-2 items-center relative">
+        <div className="relative px-8 py-14 md:px-14 md:py-20" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+          <div className="flex items-center gap-2 mb-6 px-4 py-1.5 rounded-full w-fit mx-auto md:mx-0" style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", backdropFilter: "blur(6px)" }}>
+            <Sparkles size={14} color="#FFD9CE" />
+            <span style={{ color: "#FFD9CE", fontFamily: "Tajawal", fontSize: 13, letterSpacing: 1 }}>{t.tagline}</span>
+          </div>
+          <h1 style={{
+            fontFamily: "Amiri, serif", color: "#FBF9FF", fontSize: "clamp(2rem, 4.2vw, 3rem)",
+            lineHeight: 1.3, maxWidth: 460, fontWeight: 700
+          }}>{t.heroTitle}</h1>
+          <p style={{ color: "#E4DBFF", fontFamily: "Tajawal", fontSize: 16, maxWidth: 460, marginTop: 16 }}>{t.heroSub}</p>
+          <button onClick={onEnter} className="mt-8 px-8 py-3.5 rounded-full transition-transform hover:scale-105"
+            style={{ background: "linear-gradient(135deg,#FF9E8F,#C9A6FF)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 16, boxShadow: "0 10px 30px -8px rgba(201,166,255,0.5)" }}>
+            {t.getStarted}
+          </button>
+        </div>
+
+        <div className="relative flex justify-center px-6 pb-8 md:pb-0">
+          <div className="relative" style={{
+            width: "min(260px, 70vw)", height: 300,
+            borderTopLeftRadius: 140, borderTopRightRadius: 140,
+            overflow: "hidden", border: "1px solid rgba(255,255,255,0.35)",
+            boxShadow: "0 0 60px -10px rgba(255,158,143,0.45)"
+          }}>
+            <div style={{
+              position: "absolute", inset: 0,
+              background: "linear-gradient(180deg, #2B2554 0%, #6E4E84 35%, #D98E76 60%, #F4B69B 75%, #C9A6FF 100%)"
+            }} />
+            <div style={{ position: "absolute", top: 28, right: 36, width: 26, height: 26, borderRadius: "50%", background: "#FFF6E8", boxShadow: "0 0 18px 4px rgba(255,246,232,0.6)" }} />
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: "32%", height: 1, background: "rgba(255,255,255,0.25)" }} />
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: "70%", background: "linear-gradient(180deg, rgba(255,200,180,0.25), rgba(43,37,84,0.6))" }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Lantern({ t, lang, reader, quote }) {
+  return (
+    <div className="rounded-3xl p-6 relative" style={{
+      background: "linear-gradient(160deg, #2D2A57, rgba(255,255,255,0.06))",
+      border: "1px solid rgba(255,255,255,0.18)",
+      boxShadow: "0 0 60px -20px rgba(216,168,87,0.25)"
+    }}>
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#FFB19922" }}>
+          <Sparkles size={16} color="#FFB199" />
+        </div>
+        <span style={{ fontFamily: "Tajawal", color: "#FFB199", fontWeight: 700, fontSize: 14 }}>{t.readerOfWeek}</span>
+      </div>
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#A78BFA33", color: "#F4F0FF", fontFamily: "Amiri", fontWeight: 700 }}>
+          {reader.name.charAt(0)}
+        </div>
+        <div>
+          <div style={{ color: "#F4F0FF", fontFamily: "Tajawal", fontWeight: 700 }}>{reader.name}</div>
+          <div style={{ color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 12 }}>{reader.hours}h · {reader.book}</div>
+        </div>
+      </div>
+
+      <GoldDivider />
+
+      <div className="flex items-center gap-2 mb-3">
+        <QuoteIcon size={14} color="#FFB199" />
+        <span style={{ fontFamily: "Tajawal", color: "#FFB199", fontWeight: 700, fontSize: 14 }}>{t.dailyQuote}</span>
+      </div>
+      <p style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 19, lineHeight: 1.7 }}>
+        “{quote[lang]}”
+      </p>
+      <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13, marginTop: 8 }}>{t.quoteCredit} {quote.by}</p>
+      <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11, marginTop: 14, fontStyle: "italic" }}>{t.newQuoteIn}</p>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, sub }) {
+  return (
+    <div className="rounded-2xl p-5 flex items-start gap-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#A78BFA22" }}>
+        <Icon size={18} color="#FFB199" />
+      </div>
+      <div>
+        <div style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 24, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+        <div style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5 }}>{label}</div>
+        {sub && <div style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
 
 function StarRow({ value, size = 13, onChange }) {
   const stars = [1, 2, 3, 4, 5];
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       {stars.map((s) => (
-        <button key={s} type="button" disabled={!onChange} onClick={() => onChange && onChange(s)} style={{ cursor: onChange ? "pointer" : "default", lineHeight: 0 }}>
+        <button
+          key={s}
+          type="button"
+          disabled={!onChange}
+          onClick={() => onChange && onChange(s)}
+          style={{ cursor: onChange ? "pointer" : "default", lineHeight: 0 }}
+        >
           <Star size={size} color="#FFD9CE" fill={s <= value ? "#FFB199" : "transparent"} strokeWidth={1.5} />
         </button>
       ))}
@@ -137,329 +412,148 @@ function StarRow({ value, size = 13, onChange }) {
   );
 }
 
-function BookSpine({ book, t, lang, onOpen }) {
+function BookSpine({ book, t, lang, onOpen, compact = false }) {
   const pct = book.totalPages ? Math.round((book.page / book.totalPages) * 100) : 0;
   const hasCover = !!book.cover;
 
+  if (compact) {
+    return (
+      <button onClick={() => onOpen(book)} className="text-left group block w-full" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+        <div className="relative rounded-lg overflow-hidden transition-transform group-hover:-translate-y-1.5"
+          style={{
+            background: hasCover ? `url(${book.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${book.color}cc, ${book.color}99)`,
+            height: 164, boxShadow: "0 10px 18px -8px rgba(0,0,0,0.6)",
+          }}>
+          {!hasCover && (
+            <div className="absolute inset-0 flex items-center justify-center p-3">
+              <span style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 13, textAlign: "center", lineHeight: 1.3 }}>{book.title}</span>
+            </div>
+          )}
+          {book.status === "reading" && (
+            <div className="absolute bottom-0 left-0 right-0 h-1" style={{ background: "#00000033" }}>
+              <div className="h-1" style={{ width: `${pct}%`, background: "#FFB199" }} />
+            </div>
+          )}
+        </div>
+        <p style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11.5, marginTop: 6, lineHeight: 1.3 }} className="line-clamp-2">{book.title}</p>
+        {book.rating > 0 && <div className="mt-1"><StarRow value={book.rating} size={11} /></div>}
+      </button>
+    );
+  }
+
   return (
-    <button onClick={() => onOpen(book)} className="text-left group block w-full relative" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
-      <div className="relative rounded-lg overflow-hidden transition-all duration-300 group-hover:-translate-y-2 group-hover:scale-[1.03]"
+    <button onClick={() => onOpen(book)} className="text-left group" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+      <div className="relative rounded-xl p-4 h-full flex flex-col justify-between transition-transform group-hover:-translate-y-1 overflow-hidden"
         style={{
-          background: hasCover ? `url(${book.cover}) center/cover no-repeat` : `linear-gradient(165deg, ${book.color}EE, #1c1836)`,
-          height: 180, width: 120,
-          boxShadow: "5px 12px 24px -6px rgba(0,0,0,0.8), -2px 0 6px rgba(255,255,255,0.1) inset",
-          border: "1px solid rgba(255,255,255,0.08)"
+          background: hasCover ? `url(${book.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${book.color}cc, ${book.color}99)`,
+          minHeight: 150, boxShadow: "0 8px 20px -10px rgba(0,0,0,0.6)"
         }}>
-        <div className="absolute inset-y-0 left-0 w-2 pointer-events-none" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.3), transparent)" }} />
-        {!hasCover && (
-          <div className="absolute inset-0 flex flex-col justify-between p-3 bg-opacity-40 bg-black">
-            <span style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 13, textAlign: "center", lineHeight: 1.3 }} className="line-clamp-4">{book.title}</span>
-            <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 10, textAlign: "center" }} className="truncate">{book.author}</span>
-          </div>
+        {hasCover && (
+          <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(20,15,40,0.15) 0%, rgba(20,15,40,0.75) 100%)" }} />
         )}
-        {book.status === "reading" && (
-          <div className="absolute bottom-0 left-0 right-0 h-1.5" style={{ background: "rgba(0,0,0,0.4)" }}>
-            <div className="h-1.5 transition-all" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #FFB199, #A78BFA)" }} />
-          </div>
-        )}
+        <div className="relative">
+          <div style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontWeight: 700, fontSize: 16, lineHeight: 1.35, textShadow: hasCover ? "0 1px 6px rgba(0,0,0,0.6)" : "none" }}>{book.title}</div>
+          <div style={{ fontFamily: "Tajawal", color: "#F4F0FFcc", fontSize: 12, marginTop: 4, opacity: 0.9 }}>{t.author} {book.author}</div>
+        </div>
+        <div className="relative">
+          {book.status !== "want" && (
+            <div className="mt-3">
+              <div className="w-full h-1.5 rounded-full" style={{ background: "#00000033" }}>
+                <div className="h-1.5 rounded-full" style={{ width: `${pct}%`, background: "#F4F0FF" }} />
+              </div>
+              <div style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11, marginTop: 4 }}>{pct}% · {t.page} {book.page}/{book.totalPages}</div>
+            </div>
+          )}
+          {book.status === "want" && (
+            <div style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11, marginTop: 3, opacity: 0.8 }}>{t.wantToRead}</div>
+          )}
+          {book.rating > 0 && (
+            <div className="mt-2"><StarRow value={book.rating} size={12} /></div>
+          )}
+        </div>
       </div>
-      <p style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 12, marginTop: 8, fontWeight: 500 }} className="line-clamp-1">{book.title}</p>
-      <p style={{ fontFamily: "Tajawal", color: "#A89EC9", fontSize: 10.5 }} className="truncate">{book.author}</p>
     </button>
   );
 }
 
 // ---------------------------------------------------------------
-// Reader Component (المتصفح المعدل)
+// Auth screen
 // ---------------------------------------------------------------
-function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdateBookmark }) {
-  const [tool, setTool] = useState(null);
-  const [showStickerMenu, setShowStickerMenu] = useState(false);
-  const [selectedSticker, setSelectedSticker] = useState(STICKER_OPTIONS[0]);
-  const [hlColor, setHlColor] = useState(HL_COLORS[0]);
-  
-  const [pageText, setPageText] = useState("");
-  const [highlights, setHighlights] = useState(book.highlights || []);
-  const [stickers, setStickers] = useState(book.stickers || []);
-  const [ratingDraft, setRatingDraft] = useState(book.rating || 0);
-  const [reviewDraft, setReviewDraft] = useState(book.review || "");
-  const [loadingText, setLoadingText] = useState(false);
+function AuthScreen({ t, lang, onAuth, onToggleLang }) {
+  const [mode, setMode] = useState("signin");
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const textContainerRef = useRef(null);
-
-  // استخراج النص الحقيقي المتوافق مع الـ PDF والـ EPUB
-  useEffect(() => {
-    let active = true;
-    async function loadBookContent() {
-      if (!book.fileBlob) {
-        setPageText(lang === "ar" 
-          ? `محتوى افتراضي لكتاب [${book.title}]: لم يتم رفع مستند حقيقي لهذا الكتاب، يمكنك تفعيل الرفع لملفات PDF أو EPUB لقراءة نصوص حية.`
-          : `Fallback content for [${book.title}]: Please upload a real PDF/EPUB to pull actual pages.`
-        );
-        return;
-      }
-
-      setLoadingText(true);
-      try {
-        const isEpub = book.fileBlob.name.toLowerCase().endsWith(".epub");
-
-        if (isEpub) {
-          // محاكاة قراءة فصول الـ EPUB الإلكتروني بطريقة مجدولة
-          setTimeout(() => {
-            if (active) {
-              setPageText(lang === "ar"
-                ? `[محتوى EPUB الفعلي - الفصل ${book.page}]: بدأ يدرك تماماً أن الكلمات المكتوبة هي بمثابة مرآة تعكس صمت الروح وهدوء الكهف المحيط بها.`
-                : `[Actual EPUB Content - Chapter ${book.page}]: He began to fully realize that written words are a mirror reflecting the stillness of the soul.`
-              );
-              setLoadingText(false);
-            }
-          }, 600);
-        } else {
-          // قراءة الـ PDF الحقيقي وإصلاح تجميع النصوص
-          const arrayBuffer = await book.fileBlob.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-          const targetPage = Math.min(pdf.numPages, Math.max(1, book.page));
-          const pageObj = await pdf.getPage(targetPage);
-          const textContent = await pageObj.getTextContent();
-          const items = textContent.items.map(item => item.str).join(" ").trim();
-          
-          if (active) {
-            setPageText(items || (lang === "ar" ? "هذه الصفحة عبارة عن غلاف أو صورة خالية من النصوص المكتوبة." : "This page contains only image artwork."));
-            setLoadingText(false);
-          }
-        }
-      } catch (err) {
-        if (active) {
-          setPageText(lang === "ar" ? "حدث خطأ أثناء قراءة الحبر الفعلي للمستند." : "Error rendering actual document ink.");
-          setLoadingText(false);
-        }
-      }
+  const submit = async () => {
+    setError("");
+    if (!form.email || !form.password || (mode === "signup" && !form.name)) {
+      setError(lang === "ar" ? "يرجى تعبئة كل الحقول" : "Please fill in all fields");
+      return;
     }
-    loadBookContent();
-    return () => { active = false; };
-  }, [book.page, book.fileBlob, book.title, lang]);
-
-  const handleTextSelection = () => {
-    if (tool !== "pen") return;
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-    if (selectedText.length > 0) {
-      const newHighlight = { text: selectedText, color: hlColor, id: Date.now() };
-      const updated = [...highlights, newHighlight];
-      setHighlights(updated);
-      onUpdateMeta(ratingDraft, reviewDraft, updated, stickers);
-      selection.removeAllRanges();
+    setLoading(true);
+    try {
+      await onAuth(mode, form);
+    } catch (e) {
+      setError(e.message || (lang === "ar" ? "حدث خطأ، حاول مجدداً" : "Something went wrong"));
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handlePageClick = (e) => {
-    if (tool !== "sticker") return;
-    if (e.target.closest("[data-sticker-elem]") || e.target.closest(".sticker-menu-btn")) return;
-    
-    const rect = textContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const newSticker = { id: Date.now(), x, y, emoji: selectedSticker };
-    const updated = [...stickers, newSticker];
-    setStickers(updated);
-    onUpdateMeta(ratingDraft, reviewDraft, highlights, updated);
   };
 
   return (
-    <div className="min-h-screen py-6" style={{ background: "linear-gradient(160deg, #161224 0%, #292042 60%, #423054 100%)" }}>
-      <div className="max-w-3xl mx-auto px-5">
-        
-        <button onClick={onBack} className="flex items-center gap-1.5 mb-5 hover:text-white" style={{ color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 13.5 }}>
-          {lang === "ar" ? <ChevronRight size={16} /> : <ChevronLeft size={16} />} {t.backToShelf}
-        </button>
-
-        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <div>
-            <h2 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 24, fontWeight: 700 }}>{book.title}</h2>
-            <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13 }}>{t.page} {book.page} {t.of} {book.totalPages}</p>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: "linear-gradient(160deg, #211C3D 0%, #3B2F66 55%, #6B4C72 100%)", backgroundAttachment: "fixed" }}>
+      <button onClick={onToggleLang} className="fixed top-5 right-5 rtl:right-auto rtl:left-5 flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+        style={{ background: "rgba(255,255,255,0.09)", border: "1px solid rgba(255,255,255,0.18)", backdropFilter: "blur(14px)", color: "#FFB199", fontFamily: "Tajawal", fontSize: 13 }}>
+        <Globe size={13} /> {t.switchLang}
+      </button>
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "linear-gradient(160deg,#FFB199,#A78BFA)" }}>
+            <BookOpen size={26} color="#241F45" />
           </div>
+          <h1 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 28, fontWeight: 700 }}>{t.appName}</h1>
+          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13, marginTop: 2 }}>{t.tagline}</p>
         </div>
 
-        {/* شريط الأدوات مع تصفيف الـ z-index لمنع ظهور المنيو في الخلف بالخطأ */}
-        <div className="flex items-center gap-2 mb-4 p-2 rounded-2xl flex-wrap relative z-30" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}>
-          <button onClick={() => setTool(tool === "pen" ? null : "pen")} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs"
-            style={{ background: tool === "pen" ? "rgba(255,177,153,0.2)" : "transparent", color: tool === "pen" ? "#FFB199" : "#B6ACD6", fontFamily: "Tajawal" }}>
-            <Highlighter size={15} /> {t.pen}
-          </button>
+        <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+          <h2 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 18, marginBottom: 18 }}>
+            {mode === "signin" ? t.welcomeBack : t.joinCave}
+          </h2>
 
-          <div className="relative">
-            <button onClick={() => { setTool("sticker"); setShowStickerMenu(!showStickerMenu); }} className="sticker-menu-btn flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs"
-              style={{ background: tool === "sticker" ? "rgba(167,139,250,0.2)" : "transparent", color: tool === "sticker" ? "#C084FC" : "#B6ACD6", fontFamily: "Tajawal" }}>
-              <Sticker size={15} /> {t.sticker} ({selectedSticker})
-            </button>
+          {mode === "signup" && (
+            <Field label={t.name} value={form.name} onChange={(v) => setForm({ ...form, name: v })} />
+          )}
+          <Field label={t.email} value={form.email} onChange={(v) => setForm({ ...form, email: v })} type="email" />
+          <Field label={t.password} value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" />
 
-            {/* تم حل المشكلة: إضافة z-50 كامل وتأكيد الخلفية غير الشفافة */}
-            {showStickerMenu && (
-              <div className="absolute top-12 left-0 rtl:left-auto rtl:right-0 z-50 p-2.5 rounded-xl grid grid-cols-4 gap-2 w-48 shadow-2xl border bg-[#1c1836]" style={{ borderColor: "rgba(255,255,255,0.2)" }}>
-                {STICKER_OPTIONS.map((emoji) => (
-                  <button key={emoji} onClick={() => { setSelectedSticker(emoji); setShowStickerMenu(false); }} className="w-9 h-9 flex items-center justify-center rounded bg-white bg-opacity-5 hover:bg-opacity-20 text-lg transition-transform active:scale-95">
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* لوحة القراءة الرئيسية مسندة بـ z-10 لمنع أي تداخلات تحتية */}
-        <div
-          ref={textContainerRef}
-          onMouseUp={handleTextSelection}
-          onTouchEnd={handleTextSelection}
-          onClick={handlePageClick}
-          className="relative rounded-2xl p-8 md:p-12 shadow-inner select-text z-10"
-          style={{ 
-            background: "#FBF9FF", 
-            minHeight: 400, 
-            cursor: tool === "sticker" ? "pointer" : "default" 
-          }}
-        >
-          {loadingText && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-2xl z-20">
-              <span className="text-sm font-medium animate-pulse text-[#2A2350]" style={{ fontFamily: "Tajawal" }}>{lang === "ar" ? "جاري استخراج حبر النص الحقيقي للمستند..." : "Reading actual document ink..."}</span>
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg mb-3" style={{ background: "rgba(244,63,94,0.15)", border: "1px solid rgba(244,63,94,0.3)" }}>
+              <AlertCircle size={14} color="#FB7185" />
+              <span style={{ fontFamily: "Tajawal", color: "#FECDD3", fontSize: 12.5 }}>{error}</span>
             </div>
           )}
 
-          <p style={{ fontFamily: "Amiri, serif", color: "#1F1A3A", fontSize: 20, lineHeight: 2.1, textAlign: "justify" }}>
-            {pageText}
-          </p>
-
-          {stickers.map((s) => (
-            <div key={s.id} data-sticker-elem className="absolute group" style={{ left: s.x - 14, top: s.y - 14 }}>
-              <span className="text-2xl select-none">{s.emoji}</span>
-              <button onClick={(e) => { e.stopPropagation(); const updated = stickers.filter(st => st.id !== s.id); setStickers(updated); onUpdateMeta(ratingDraft, reviewDraft, highlights, updated); }} className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold">✕</button>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-between mt-6">
-          <button disabled={book.page <= 1} onClick={() => onUpdatePage(Math.max(1, book.page - 1))} className="px-5 py-2.5 rounded-full text-xs text-[#B6ACD6] bg-white bg-opacity-5 disabled:opacity-40">
-            {lang === "ar" ? "→ الصفحة السابقة" : "← Previous"}
-          </button>
-          <button disabled={book.page >= book.totalPages} onClick={() => onUpdatePage(Math.min(book.totalPages, book.page + 1))} className="px-5 py-2.5 rounded-full text-xs font-bold text-[#241F45]" style={{ background: "linear-gradient(135deg,#FFB199,#A78BFA)" }}>
-            {lang === "ar" ? "الصفحة التالية ←" : "Next Page →"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------
-// Add Book Modal (يدعم صيغتي PDF + EPUB)
-// ---------------------------------------------------------------
-function AddBookModal({ t, lang, onClose, onAdd }) {
-  const [form, setForm] = useState({ title: "", author: "", genre: "novel", totalPages: 100, color: SPINE_COLORS[0], cover: null, fileName: null, fileBlob: null });
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef(null);
-
-  const handleBookFile = async (file) => {
-    if (!file) return;
-    setUploading(true);
-    try {
-      const nameLower = file.name.toLowerCase();
-      const isPdf = nameLower.endsWith(".pdf") || file.type === "application/pdf";
-      const isEpub = nameLower.endsWith(".epub") || file.type === "application/epub+zip";
-      
-      let extractedCover = null;
-      let totalPages = form.totalPages;
-
-      if (isPdf) {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        totalPages = pdf.numPages || totalPages;
-        
-        const firstPage = await pdf.getPage(1);
-        const viewport = firstPage.getViewport({ scale: 1.2 });
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await firstPage.render({ canvasContext: ctx, viewport }).promise;
-        extractedCover = canvas.toDataURL("image/jpeg", 0.85);
-      } else if (isEpub) {
-        // تعيين عدد صفحات تقديري لملفات الـ EPUB الإلكترونية
-        totalPages = 45; 
-      }
-
-      const cleanTitle = form.title || file.name.replace(/\.[^/.]+$/, "");
-      setForm((f) => ({
-        ...f,
-        fileBlob: file,
-        cover: extractedCover,
-        fileName: file.name,
-        title: cleanTitle,
-        totalPages: totalPages
-      }));
-    } catch (e) {
-      console.error("Meta extraction skipped, fallback cover applied.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black bg-opacity-70" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl p-6 bg-[#211c3d] border border-white border-opacity-10 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 17 }}>{t.addBook}</h3>
-          <button onClick={onClose}><X size={18} color="#B6ACD6" /></button>
-        </div>
-
-        <div className="mb-4">
-          <label className="text-xs mb-1.5 block" style={{ fontFamily: "Tajawal", color: "#B6ACD6" }}>{t.uploadBook}</label>
-          {/* تم تعديل الحقل هنا ليقبل كلاً من pdf و epub معاً */}
-          <input ref={fileRef} type="file" accept=".pdf,.epub" className="hidden" onChange={(e) => handleBookFile(e.target.files?.[0])} />
           <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            className="w-full rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-white border-opacity-20 hover:border-opacity-40 transition-all overflow-hidden"
-            style={{ height: 140, background: form.cover ? `url(${form.cover}) center/cover no-repeat` : "#161329" }}
-          >
-            {!form.cover && (
-              <div className="p-4 text-center">
-                <Upload size={20} className="mx-auto mb-1 text-[#FFB199]" />
-                <span className="text-xs block" style={{ fontFamily: "Tajawal", color: "#B6ACD6" }}>
-                  {uploading ? "جاري فحص وتجهيز الملف الحقيقي..." : "اضغط لرفع ملف PDF أو EPUB واستخراج بياناته"}
-                </span>
-              </div>
-            )}
-            {form.cover && (
-              <div className="w-full h-full bg-black bg-opacity-40 flex items-end p-2 justify-between">
-                <span className="text-[10px] text-white truncate max-w-[70%] px-1.5 py-0.5 rounded bg-black bg-opacity-60">{form.fileName}</span>
-                <span className="text-[10px] text-[#FFB199] font-bold">{lang === "ar" ? "تغيير" : "Change"}</span>
-              </div>
+            onClick={submit}
+            disabled={loading}
+            className="w-full mt-3 py-3 rounded-xl flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
+            style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, opacity: loading ? 0.7 : 1 }}>
+            {loading ? (lang === "ar" ? "جارٍ التحقق…" : "Working…") : (
+              <>
+                {mode === "signin" ? <LogIn size={16} /> : <UserPlus size={16} />}
+                {mode === "signin" ? t.signIn : t.signUp}
+              </>
             )}
           </button>
-        </div>
 
-        <Field label={t.title} value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
-        <Field label={t.author} value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
-        
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="text-xs mb-1 block" style={{ fontFamily: "Tajawal", color: "#B6ACD6" }}>{t.genre}</label>
-            <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl bg-[#161329] border border-white border-opacity-10 text-white text-xs outline-none">
-              {Object.entries(GENRES[lang]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </div>
-          <Field label={t.totalPagesField} value={form.totalPages} onChange={(v) => setForm({ ...form, totalPages: v })} type="number" />
+          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13, textAlign: "center", marginTop: 16 }}>
+            {mode === "signin" ? t.noAccount : t.haveAccount}{" "}
+            <button onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }} style={{ color: "#FFB199", fontWeight: 700 }}>
+              {mode === "signin" ? t.signUp : t.signIn}
+            </button>
+          </p>
         </div>
-
-        <button
-          disabled={!form.title || uploading}
-          onClick={() => { onAdd(form); onClose(); }}
-          className="w-full py-3 rounded-xl font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, #FFB199, #A78BFA)", color: "#161224", opacity: form.title && !uploading ? 1 : 0.5 }}>
-          {t.create}
-        </button>
       </div>
     </div>
   );
@@ -467,35 +561,353 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
 
 function Field({ label, value, onChange, type = "text" }) {
   return (
-    <div className="mb-3">
-      <label className="text-xs mb-1 block" style={{ fontFamily: "Tajawal", color: "#B6ACD6" }}>{label}</label>
+    <div className="mb-4">
+      <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        className="w-full px-3.5 py-2 rounded-xl bg-[#161329] border border-white border-opacity-10 text-white text-xs outline-none" />
+        className="w-full px-3.5 py-2.5 rounded-xl outline-none"
+        style={{ background: "#211C3D", border: "1px solid rgba(255,255,255,0.18)", color: "#F4F0FF", fontFamily: "Tajawal" }} />
     </div>
   );
 }
 
-const GENRES = {
-  en: { novel: "Fiction", philosophy: "Philosophy", history: "History", poetry: "Poetry" },
-  ar: { novel: "روايات حرة", philosophy: "فلسفة وفكر", history: "تاريخ العالم", poetry: "شعر وأدب" },
+// ---------------------------------------------------------------
+// Reader (page view with pen / sticker / bookmark)
+// ---------------------------------------------------------------
+const PAGE_TEXTS = {
+  en: [
+    "The lantern light fell soft across the page, and for a moment the room beyond the page ceased to exist. There was only the next sentence, and the one after it, each a step further into the quiet dark of the story.",
+    "A cave with no end, only deeper rooms, each warmer than the last, each holding something the reader did not know they were looking for until they found it, turned it over once in the lamplight, and kept walking.",
+    "Somewhere behind the words a door was always closing softly, and another opening just as quietly — the story breathing in time with the reader's own held breath.",
+    "Pages turned like tides, pulling the room further from the world outside, until the only sound left was the rustle of paper and the low hum of the lantern's flame.",
+  ],
+  ar: [
+    "سقط ضوء الفانوس ناعماً على الصفحة، وللحظة توقفت الغرفة خلف الصفحة عن الوجود. لم يكن هناك سوى الجملة التالية، ثم التي تليها، كل واحدة خطوة أعمق في عتمة القصة الهادئة.",
+    "كهفٌ بلا نهاية، غرفٌ أعمق فقط، كل واحدة أدفأ من سابقتها، تحمل شيئاً لم يكن القارئ يعلم أنه يبحث عنه حتى وجده، قلّبه مرة في ضوء المصباح، ثم واصل السير.",
+    "خلف الكلمات، باب يُغلق بهدوء دائماً، وآخر يُفتح بالهدوء نفسه — القصة تتنفس بإيقاع أنفاس القارئ المحبوسة.",
+    "تتقلب الصفحات كالمد، تسحب الغرفة أبعد عن العالم الخارجي، حتى لا يبقى صوت سوى حفيف الورق وأزيز شعلة الفانوس الخافت.",
+  ],
 };
 
+const STICKERS = ["⭐", "🔖", "❤️", "🪶", "🕯️"];
+const HL_COLORS = ["#FFB19988", "#A78BFA66", "#7C8CFF77", "#F472B666"];
+
+function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdateBookmark }) {
+  const [tool, setTool] = useState(null);
+  const [hlColor, setHlColor] = useState(HL_COLORS[0]);
+  const [highlights, setHighlights] = useState([]);
+  const [stickers, setStickers] = useState([]);
+  const [ratingDraft, setRatingDraft] = useState(book.rating || 0);
+  const [reviewDraft, setReviewDraft] = useState(book.review || "");
+  const [justBookmarked, setJustBookmarked] = useState(false);
+  const containerRef = useRef(null);
+  const bookmarkPage = book.bookmark;
+
+  const captureHighlight = () => {
+    if (tool !== "pen") return;
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    if (text.length > 0) {
+      setHighlights((h) => [...h, { text, color: hlColor }]);
+      sel.removeAllRanges();
+    }
+  };
+  const handleTouchEnd = () => setTimeout(captureHighlight, 60);
+
+  const handlePageClick = (e) => {
+    if (tool !== "sticker") return;
+    if (e.target.closest("[data-sticker]")) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setStickers((s) => [...s, { id: Date.now(), x, y, emoji: STICKERS[s.length % STICKERS.length] }]);
+  };
+
+  const removeSticker = (id, e) => {
+    e.stopPropagation();
+    setStickers((s) => s.filter((st) => st.id !== id));
+  };
+
+  const setBookmark = () => {
+    onUpdateBookmark(book.page);
+    setJustBookmarked(true);
+    setTimeout(() => setJustBookmarked(false), 1500);
+  };
+
+  const pageTextIndex = book.page % PAGE_TEXTS[lang].length;
+  const atFirstPage = book.page <= 0;
+  const atLastPage = book.page >= book.totalPages;
+
+  return (
+    <div className="min-h-screen" style={{ background: "linear-gradient(160deg, #211C3D 0%, #3B2F66 55%, #6B4C72 100%)", backgroundAttachment: "fixed" }}>
+      <div className="max-w-3xl mx-auto px-5 py-6">
+        <button onClick={onBack} className="flex items-center gap-1.5 mb-5" style={{ color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 13 }}>
+          {lang === "ar" ? <ChevronRight size={16} /> : <ChevronLeft size={16} />} {t.backToShelf}
+        </button>
+
+        <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+          <div>
+            <h2 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 22, fontWeight: 700 }}>{book.title}</h2>
+            <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13 }}>{t.page} {book.page} {t.of} {book.totalPages}</p>
+          </div>
+          {bookmarkPage != null && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: justBookmarked ? "#FFB19944" : "#A78BFA33", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12, transition: "background 0.3s" }}>
+              <Bookmark size={13} /> {t.bookmarkSet} {bookmarkPage}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 mb-4 p-2 rounded-2xl flex-wrap" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+          <ToolBtn icon={Highlighter} active={tool === "pen"} label={t.pen} onClick={() => setTool(tool === "pen" ? null : "pen")} />
+          <ToolBtn icon={Sticker} active={tool === "sticker"} label={t.sticker} onClick={() => setTool(tool === "sticker" ? null : "sticker")} />
+          <ToolBtn icon={Bookmark} active={false} label={t.bookmarkTool} onClick={setBookmark} />
+          {tool === "pen" && (
+            <div className="flex items-center gap-1.5 ms-2">
+              {HL_COLORS.map((c) => (
+                <button key={c} onClick={() => setHlColor(c)} className="w-5 h-5 rounded-full"
+                  style={{ background: c, outline: hlColor === c ? "2px solid #FFB199" : "none", outlineOffset: 2 }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div
+          ref={containerRef}
+          onMouseUp={captureHighlight}
+          onTouchEnd={handleTouchEnd}
+          onClick={handlePageClick}
+          className="relative rounded-3xl p-8 md:p-12"
+          style={{ background: "#F4F0FF", minHeight: 380, cursor: tool === "sticker" ? "crosshair" : "text" }}
+        >
+          <p style={{ fontFamily: "Amiri, serif", color: "#2A2350", fontSize: 19, lineHeight: 2, textAlign: lang === "ar" ? "right" : "left" }}>
+            {PAGE_TEXTS[lang][pageTextIndex]}
+          </p>
+          {stickers.map((s) => (
+            <span key={s.id} data-sticker onClick={(e) => removeSticker(s.id, e)}
+              style={{ position: "absolute", left: s.x - 12, top: s.y - 12, fontSize: 22, cursor: "pointer" }}>
+              {s.emoji}
+            </span>
+          ))}
+        </div>
+
+        {highlights.length > 0 && (
+          <div className="mt-5">
+            <h3 style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{t.recentHighlights}</h3>
+            <div className="space-y-2">
+              {highlights.map((h, i) => (
+                <div key={i} className="px-3 py-2 rounded-lg" style={{ background: h.color, color: "#2A2350", fontFamily: "Tajawal", fontSize: 13 }}>
+                  “{h.text}”
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-6">
+          <button
+            disabled={atFirstPage}
+            onClick={() => onUpdatePage(Math.max(0, book.page - 10))}
+            className="px-4 py-2 rounded-full"
+            style={{ background: "rgba(255,255,255,0.06)", color: "#B6ACD6", fontFamily: "Tajawal", fontSize: 13, opacity: atFirstPage ? 0.4 : 1, cursor: atFirstPage ? "not-allowed" : "pointer" }}>
+            {lang === "ar" ? "→ السابقة" : "← Prev"}
+          </button>
+          <button
+            disabled={atLastPage}
+            onClick={() => onUpdatePage(Math.min(book.totalPages, book.page + 10))}
+            className="px-4 py-2 rounded-full"
+            style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 13, opacity: atLastPage ? 0.5 : 1, cursor: atLastPage ? "not-allowed" : "pointer" }}>
+            {lang === "ar" ? "التالية ←" : "Next →"}
+          </button>
+        </div>
+
+        <div className="mt-8 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+          <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+            {lang === "ar" ? "تقييمي للكتاب" : "My rating"}
+          </h3>
+          <StarRow value={ratingDraft} size={24} onChange={(v) => { setRatingDraft(v); onUpdateMeta(v, reviewDraft); }} />
+
+          <h4 style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontWeight: 600, fontSize: 12.5, marginTop: 18, marginBottom: 6 }}>
+            {lang === "ar" ? "تعليقي" : "My comment"}
+          </h4>
+          <textarea
+            value={reviewDraft}
+            onChange={(e) => setReviewDraft(e.target.value)}
+            onBlur={() => onUpdateMeta(ratingDraft, reviewDraft)}
+            placeholder={lang === "ar" ? "اكتب رأيك أو انطباعك عن الكتاب…" : "Write your thoughts about this book…"}
+            rows={3}
+            className="w-full px-3.5 py-3 rounded-xl outline-none resize-none"
+            style={{ background: "#211C3D", border: "1px solid rgba(255,255,255,0.18)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 13.5 }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolBtn({ icon: Icon, active, label, onClick }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-colors"
+      style={{ background: active ? "#A78BFA33" : "transparent", color: active ? "#FFB199" : "#B6ACD6", fontFamily: "Tajawal", fontSize: 13 }}>
+      <Icon size={15} /> {label}
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------
-// Main Application Context
+// Add Book Modal
+// ---------------------------------------------------------------
+function AddBookModal({ t, lang, onClose, onAdd }) {
+  const [form, setForm] = useState({ title: "", author: "", genre: "novel", totalPages: 200, color: SPINE_COLORS[0], cover: null, fileName: null });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const fileRef = useRef(null);
+
+  const coverFromPdf = async (file) => {
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1.4 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    return { cover: canvas.toDataURL("image/jpeg", 0.9), totalPages: pdf.numPages };
+  };
+
+  const coverFromTitle = (title, color) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 400; canvas.height = 560;
+    const ctx = canvas.getContext("2d");
+    const grad = ctx.createLinearGradient(0, 0, 400, 560);
+    grad.addColorStop(0, color); grad.addColorStop(1, "#241F45");
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 400, 560);
+    ctx.fillStyle = "#F4F0FF"; ctx.font = "bold 32px 'Amiri', serif"; ctx.textAlign = "center";
+    const words = (title || "Book").split(" ");
+    let line = "", y = 250, lines = [];
+    words.forEach((w) => {
+      const test = line + w + " ";
+      if (ctx.measureText(test).width > 320 && line) { lines.push(line); line = w + " "; }
+      else line = test;
+    });
+    lines.push(line);
+    lines.slice(0, 5).forEach((l, i) => ctx.fillText(l.trim(), 200, y + i * 42));
+    return canvas.toDataURL("image/jpeg", 0.9);
+  };
+
+  const handleBookFile = async (file) => {
+    if (!file) return;
+    setUploadError("");
+    setUploading(true);
+    try {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const niceTitle = form.title || file.name.replace(/\.(pdf|epub)$/i, "");
+      let cover, totalPages = form.totalPages;
+      if (isPdf) {
+        const result = await coverFromPdf(file);
+        cover = result.cover;
+        totalPages = result.totalPages || totalPages;
+      } else {
+        cover = coverFromTitle(niceTitle, form.color);
+      }
+      setForm((f) => ({ ...f, cover, fileName: file.name, title: f.title || niceTitle, totalPages }));
+    } catch (e) {
+      setUploadError(lang === "ar" ? "تعذّر استخراج الغلاف من الملف، جرّب ملف آخر." : "Couldn't extract a cover from this file — try another one.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: "#00000099" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 17 }}>{t.addBook}</h3>
+          <button onClick={onClose}><X size={18} color="#B6ACD6" /></button>
+        </div>
+
+        <div className="mb-4">
+          <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.uploadBook}</label>
+          <input ref={fileRef} type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" className="hidden" onChange={(e) => handleBookFile(e.target.files?.[0])} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="w-full rounded-xl overflow-hidden relative flex items-center justify-center"
+            style={{ background: form.cover ? `url(${form.cover}) center/cover no-repeat` : "#211C3D", border: "1px dashed rgba(255,255,255,0.25)", height: form.cover ? 160 : 80 }}
+          >
+            {!form.cover && (
+              <div className="flex flex-col items-center gap-1.5">
+                <Upload size={18} color="#B6ACD6" />
+                <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>
+                  {uploading
+                    ? (lang === "ar" ? "جارٍ استخراج الغلاف…" : "Extracting cover…")
+                    : (lang === "ar" ? `اضغط لرفع كتاب (pdf / epub.)` : "Tap to upload a book (.pdf / .epub)")}
+                </span>
+              </div>
+            )}
+            {form.cover && (
+              <div className="absolute bottom-1.5 inset-x-1.5 flex justify-between items-center">
+                <span className="px-2 py-1 rounded-full truncate max-w-[60%]" style={{ background: "rgba(20,15,40,0.7)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 10.5 }}>
+                  {form.fileName}
+                </span>
+                <span className="px-2 py-1 rounded-full" style={{ background: "rgba(20,15,40,0.7)", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 11 }}>
+                  {lang === "ar" ? "تغيير" : "Change"}
+                </span>
+              </div>
+            )}
+          </button>
+          {uploadError && (
+            <p style={{ fontFamily: "Tajawal", color: "#FB7185", fontSize: 11.5, marginTop: 6 }}>{uploadError}</p>
+          )}
+        </div>
+
+        <Field label={t.title} value={form.title} onChange={(v) => setForm({ ...form, title: v })} />
+        <Field label={t.author} value={form.author} onChange={(v) => setForm({ ...form, author: v })} />
+        <div className="mb-4">
+          <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.genre}</label>
+          <select value={form.genre} onChange={(e) => setForm({ ...form, genre: e.target.value })}
+            className="w-full px-3.5 py-2.5 rounded-xl outline-none" style={{ background: "#211C3D", border: "1px solid rgba(255,255,255,0.18)", color: "#F4F0FF", fontFamily: "Tajawal" }}>
+            {Object.entries(GENRES[lang]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <Field label={t.totalPagesField} value={form.totalPages} onChange={(v) => setForm({ ...form, totalPages: v })} type="number" />
+
+        {!form.cover && (
+          <div className="mb-5">
+            <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.coverColor}</label>
+            <div className="flex gap-2">
+              {SPINE_COLORS.map((c) => (
+                <button key={c} onClick={() => setForm({ ...form, color: c })} className="w-7 h-7 rounded-full"
+                  style={{ background: c, outline: form.color === c ? "2px solid #FFB199" : "none", outlineOffset: 2 }} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        <button
+          disabled={!form.title || uploading}
+          onClick={() => { onAdd(form); onClose(); }}
+          className="w-full py-3 rounded-xl"
+          style={{ background: form.title ? "linear-gradient(180deg,#FFB199,#A78BFA)" : "rgba(255,255,255,0.18)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, opacity: form.title && !uploading ? 1 : 0.6 }}>
+          {t.create}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------
+// Main App Component
 // ---------------------------------------------------------------
 const rowToBook = (r) => ({
   id: r.id, title: r.title, author: r.author || "", genre: r.genre,
   totalPages: r.total_pages, page: r.page, status: r.status, color: r.color,
   words: r.words, sessions: r.sessions || [0,0,0,0,0,0,0], bookmark: r.bookmark,
   cover: r.cover_url || null, rating: r.rating || 0, review: r.review || "",
-  highlights: r.highlights || [], stickers: r.stickers || [], fileBlob: null
 });
-
 const bookToInsertRow = (b) => ({
   title: b.title, author: b.author || "", genre: b.genre, total_pages: b.totalPages,
   page: b.page || 0, status: b.status || "want", color: b.color, words: b.words || 0,
   sessions: b.sessions || [0,0,0,0,0,0,0], cover_url: b.cover || null,
-  rating: b.rating || 0, review: b.review || "", highlights: b.highlights || [], stickers: b.stickers || []
+  rating: b.rating || 0, review: b.review || "",
 });
 
 export default function KahfAlKutub() {
@@ -515,7 +927,12 @@ export default function KahfAlKutub() {
       ? await sb.signUp(form.email, form.password, form.name)
       : await sb.signIn(form.email, form.password);
 
-    if (!data.access_token) return;
+    if (!data.access_token) {
+      throw new Error(lang === "ar"
+        ? "تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيده ثم سجّل الدخول."
+        : "Account created. Check your email to confirm it, then sign in.");
+    }
+
     setToken(data.access_token);
     setUser({ name: data.user?.user_metadata?.name || form.email.split("@")[0], email: data.user?.email });
 
@@ -525,6 +942,12 @@ export default function KahfAlKutub() {
       rows = await sb.insertBooks(data.access_token, starter);
     }
     setBooks(rows.map(rowToBook));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setToken(null);
+    setBooks([]);
   };
 
   const persistBook = async (id, patch) => {
@@ -540,33 +963,55 @@ export default function KahfAlKutub() {
 
   const addBook = async (form) => {
     if (!token) return;
-    const newBookObj = {
+    const row = bookToInsertRow({
       title: form.title,
-      author: form.author || (lang === "ar" ? "كاتب مجهول" : "Unknown"),
+      author: form.author || (lang === "ar" ? "غير معروف" : "Unknown"),
       genre: form.genre,
-      totalPages: Number(form.totalPages) || 120,
-      page: 1,
-      status: "reading",
+      totalPages: Number(form.totalPages) || 200,
+      page: 0,
+      status: "want",
       color: form.color,
-      words: 15000,
+      words: 0,
       cover: form.cover || null,
-      highlights: [],
-      stickers: []
-    };
-    
+    });
+    setSaveState("saving");
     try {
-      const [inserted] = await sb.insertBooks(token, [bookToInsertRow(newBookObj)]);
-      const created = rowToBook(inserted);
-      created.fileBlob = form.fileBlob; 
-      setBooks((bs) => [...bs, created]);
+      const [inserted] = await sb.insertBooks(token, [row]);
+      setBooks((bs) => [...bs, rowToBook(inserted)]);
+      setSaveState("saved");
     } catch (e) {
-      console.error(e);
+      setSaveState("idle");
     }
   };
 
-  const reading = books.filter((b) => b.status === "reading" && b.title.toLowerCase().includes(search.toLowerCase()));
-  const want = books.filter((b) => b.status === "want" && b.title.toLowerCase().includes(search.toLowerCase()));
-  const finished = books.filter((b) => b.status === "finished" && b.title.toLowerCase().includes(search.toLowerCase()));
+  const quote = useMemo(() => todaysQuote(), []);
+  const reader = READERS_OF_WEEK[lang][0];
+
+  const totalHours = useMemo(() => Math.round(books.reduce((a, b) => a + b.sessions.reduce((x, y) => x + y, 0), 0) / 60 * 10) / 10, [books]);
+  const finishedCount = books.filter((b) => b.status === "finished").length;
+  const totalWords = books.reduce((a, b) => a + (b.status === "finished" ? b.words : Math.round(b.words * (b.page / (b.totalPages || 1)))), 0);
+  
+  const genreCounts = useMemo(() => {
+    const m = {};
+    books.forEach((b) => { m[b.genre] = (m[b.genre] || 0) + 1; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  }, [books]);
+
+  const weekData = useMemo(() => {
+    const days = lang === "ar" ? ["س", "ح", "ن", "ث", "ر", "خ", "ج"] : ["S", "S", "M", "T", "W", "T", "F"];
+    const totals = [0,0,0,0,0,0,0];
+    books.forEach((b) => b.sessions.forEach((m, i) => totals[i] += m));
+    return totals.map((v, i) => ({ day: days[i], v }));
+  }, [books, lang]);
+  
+  const maxWeek = Math.max(...weekData.map((d) => d.v), 1);
+
+  const filteredBooks = books.filter((b) => b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase()));
+  const reading = filteredBooks.filter((b) => b.status === "reading");
+  const want = filteredBooks.filter((b) => b.status === "want");
+  const finished = filteredBooks.filter((b) => b.status === "finished");
+
+  const dailyLine = t.motivational[new Date().getDate() % t.motivational.length];
 
   if (!user) {
     return (
@@ -589,19 +1034,18 @@ export default function KahfAlKutub() {
           onUpdatePage={(p) => {
             const status = p >= openBook.totalPages ? "finished" : "reading";
             setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, page: p, status } : b)));
-            setOpenBook((ob) => ({ ...ob, page: p, status }));
+            setOpenBook((ob) => ({ ...ob, page: p }));
             persistBook(openBook.id, { page: p, status });
           }}
-          onUpdateMeta={(rating, review, highlights, stickers) => {
-            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, rating, review, highlights, stickers } : b)));
-            setOpenBook((ob) => ({ ...ob, rating, review, highlights, stickers }));
-            persistBook(openBook.id, { rating, review, highlights, stickers });
+          onUpdateMeta={(rating, review) => {
+            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, rating, review } : b)));
+            setOpenBook((ob) => ({ ...ob, rating, review }));
+            persistBook(openBook.id, { rating, review });
           }}
           onUpdateBookmark={(page) => {
-            const val = openBook.bookmark === page ? null : page;
-            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, bookmark: val } : b)));
-            setOpenBook((ob) => ({ ...ob, bookmark: val }));
-            persistBook(openBook.id, { bookmark: val });
+            setBooks((bs) => bs.map((b) => (b.id === openBook.id ? { ...b, bookmark: page } : b)));
+            setOpenBook((ob) => ({ ...ob, bookmark: page }));
+            persistBook(openBook.id, { bookmark: page });
           }}
         />
       </div>
@@ -609,79 +1053,290 @@ export default function KahfAlKutub() {
   }
 
   return (
-    <div dir={t.dir} className="min-h-screen text-[#FBF9FF] pb-12" style={{ background: "linear-gradient(160deg, #130f21 0%, #201a34 50%, #362547 100%)" }}>
+    <div dir={t.dir} className="min-h-screen" style={{ background: "linear-gradient(160deg, #211C3D 0%, #3B2F66 55%, #6B4C72 100%)", backgroundAttachment: "fixed" }}>
       <style>{FONT_IMPORTS}</style>
 
-      <div className="sticky top-0 z-40 bg-[#161226] bg-opacity-70 backdrop-blur-md border-b border-white border-opacity-5">
-        <div className="max-w-5xl mx-auto px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen size={20} className="text-[#FFB199]" />
-            <span style={{ fontFamily: "Amiri, serif", fontSize: 20, fontWeight: 700 }} className="text-[#FFB199]">{t.appName}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex bg-white bg-opacity-5 p-1 rounded-full text-xs">
-              <button onClick={() => setView("library")} className="px-3 py-1.5 rounded-full" style={{ background: view === "library" ? "#FFB199" : "transparent", color: view === "library" ? "#161224" : "#B6ACD6", fontWeight: 600 }}>{t.library}</button>
-              <button onClick={() => setView("dashboard")} className="px-3 py-1.5 rounded-full" style={{ background: view === "dashboard" ? "#FFB199" : "transparent", color: view === "dashboard" ? "#161224" : "#B6ACD6", fontWeight: 600 }}>{t.dashboard}</button>
+      {/* Nav */}
+      <div className="sticky top-0 z-40" style={{ background: "rgba(33,28,61,0.55)", backdropFilter: "blur(14px)", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
+        <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(160deg,#FFB199,#A78BFA)" }}>
+              <BookOpen size={18} color="#241F45" />
             </div>
+            <span style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 19, fontWeight: 700 }}>{t.appName}</span>
           </div>
+
+          <div className="hidden md:flex items-center gap-1 p-1 rounded-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+            <NavBtn icon={Library} label={t.library} active={view === "library"} onClick={() => setView("library")} />
+            <NavBtn icon={LayoutDashboard} label={t.dashboard} active={view === "dashboard"} onClick={() => setView("dashboard")} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {saveState !== "idle" && (
+              <span className="hidden sm:inline" style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11 }}>
+                {saveState === "saving" ? (lang === "ar" ? "جارٍ الحفظ…" : "Saving…") : (lang === "ar" ? "تم الحفظ ✓" : "Saved ✓")}
+              </span>
+            )}
+            <button onClick={() => setLang(lang === "ar" ? "en" : "ar")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12.5 }}>
+              <Globe size={13} /> {t.switchLang}
+            </button>
+            <button onClick={handleLogout} title={t.logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#A78BFA33", color: "#F4F0FF", fontFamily: "Amiri", fontWeight: 700 }}>
+              {user.name.charAt(0)}
+            </button>
+          </div>
+        </div>
+        <div className="flex md:hidden items-center gap-1 p-1 mx-5 mb-2 rounded-full" style={{ background: "rgba(255,255,255,0.06)", width: "fit-content" }}>
+          <NavBtn icon={Library} label={t.library} active={view === "library"} onClick={() => setView("library")} />
+          <NavBtn icon={LayoutDashboard} label={t.dashboard} active={view === "dashboard"} onClick={() => setView("dashboard")} />
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-5 mt-8">
+      <div className="max-w-6xl mx-auto px-5 py-8">
         {view === "library" && (
           <>
-            <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-              <div>
-                <h2 style={{ fontFamily: "Amiri, serif", fontSize: 28, fontWeight: 700, color: "#F4F0FF" }}>{t.myShelf}</h2>
+            <StoneArchHero t={t} lang={lang} onEnter={() => document.getElementById("shelf-section")?.scrollIntoView({ behavior: "smooth" })} />
+
+            <div className="grid lg:grid-cols-3 gap-6 mt-8">
+              <div className="lg:col-span-2" id="shelf-section">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+                  <h2 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 24, fontWeight: 700 }}>{t.myShelf}</h2>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                      <Search size={14} color="#B6ACD6" />
+                      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchShelf}
+                        style={{ background: "transparent", outline: "none", color: "#F4F0FF", fontFamily: "Tajawal", fontSize: 13, width: 130 }} />
+                    </div>
+                    <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-4 py-2 rounded-full"
+                      style={{ background: "linear-gradient(180deg,#FFB199,#A78BFA)", color: "#241F45", fontFamily: "Tajawal", fontWeight: 700, fontSize: 13 }}>
+                      <Plus size={15} /> {t.addBook}
+                    </button>
+                  </div>
+                </div>
+
+                {filteredBooks.length === 0 && (
+                  <p style={{ fontFamily: "Tajawal", color: "#B6ACD6" }}>{t.emptyShelf}</p>
+                )}
+
+                {reading.length > 0 && (
+                  <ShelfRow label={t.currentlyReading} books={reading} t={t} lang={lang} onOpen={setOpenBook} />
+                )}
+                {want.length > 0 && (
+                  <ShelfRow label={t.wantToRead} books={want} t={t} lang={lang} onOpen={setOpenBook} />
+                )}
+                {finished.length > 0 && (
+                  <ShelfRow label={t.finished} books={finished} t={t} lang={lang} onOpen={setOpenBook} />
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setShowAdd(true)} className="flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold" style={{ background: "linear-gradient(135deg, #FFB199, #A78BFA)", color: "#161224" }}>
-                  <Plus size={14} /> {t.addBook}
-                </button>
+
+              <div>
+                <Lantern t={t} lang={lang} reader={reader} quote={quote} />
+                <div className="mt-4 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                  <p style={{ fontFamily: "Amiri, serif", color: "#FFB199", fontSize: 15, lineHeight: 1.7, textAlign: "center" }}>{dailyLine}</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {view === "dashboard" && (
+          <>
+            <div className="flex items-center gap-4 mb-7">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(160deg,#FFB199,#A78BFA)" }}>
+                <span style={{ fontFamily: "Amiri", fontWeight: 700, fontSize: 26, color: "#241F45" }}>{user.name.charAt(0)}</span>
+              </div>
+              <div>
+                <h2 style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 26, fontWeight: 700 }}>{user.name}</h2>
+                <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13 }}>{t.keepGoing}</p>
               </div>
             </div>
 
-            {reading.length > 0 && <ShelfRow label={t.currentlyReading} books={reading} t={t} lang={lang} onOpen={setOpenBook} />}
-            {want.length > 0 && <ShelfRow label={t.wantToRead} books={want} t={t} lang={lang} onOpen={setOpenBook} />}
-            {finished.length > 0 && <ShelfRow label={t.finished} books={finished} t={t} lang={lang} onOpen={setOpenBook} />}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard icon={Clock} label={t.hoursRead} value={totalHours} />
+              <StatCard icon={BookMarked} label={t.booksFinished} value={finishedCount} />
+              <StatCard icon={BookOpen} label={t.wordsRead} value={totalWords.toLocaleString(lang === "ar" ? "ar-EG" : "en-US")} />
+              <StatCard icon={Flame} label={t.streak} value={9} sub={lang === "ar" ? "أيام متتالية" : "consecutive days"} />
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.currentlyReading}</h3>
+                {books.filter((b) => b.status === "reading").length === 0 ? (
+                  <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 13 }}>{t.emptyShelf}</p>
+                ) : (
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {books.filter((b) => b.status === "reading").map((b) => (
+                      <button key={b.id} onClick={() => setOpenBook(b)} className="shrink-0 w-28 text-left" style={{ textAlign: lang === "ar" ? "right" : "left" }}>
+                        <div className="rounded-lg overflow-hidden" style={{
+                          height: 110, background: b.cover ? `url(${b.cover}) center/cover no-repeat` : `linear-gradient(160deg, ${b.color}cc, ${b.color}99)`,
+                        }} />
+                        <p style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 11.5, marginTop: 6, lineHeight: 1.3 }} className="line-clamp-2">{b.title}</p>
+                        <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 10.5 }}>{t.page} {b.page}/{b.totalPages}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl p-6 flex flex-col items-center justify-center" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 14, marginBottom: 14, alignSelf: lang === "ar" ? "flex-end" : "flex-start" }}>
+                  {lang === "ar" ? "هدف القراءة" : "Reading Goal"}
+                </h3>
+                <div className="relative flex items-center justify-center" style={{ width: 130, height: 130 }}>
+                  <div style={{
+                    width: 130, height: 130, borderRadius: "50%",
+                    background: `conic-gradient(#FFB199 ${Math.min(100, (finishedCount / 12) * 100)}%, rgba(255,255,255,0.1) 0)`,
+                  }} />
+                  <div className="absolute flex flex-col items-center justify-center rounded-full" style={{ width: 98, height: 98, background: "#2D2A57" }}>
+                    <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 22, fontWeight: 700 }}>{finishedCount}/12</span>
+                    <span style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 10.5 }}>{t.booksRead}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 rounded-2xl p-6 overflow-x-auto" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>
+                  {lang === "ar" ? "سجل القراءة" : "Reading Log"}
+                </h3>
+                <table className="w-full" style={{ borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
+                      {[t.title, lang === "ar" ? "المؤلف" : "Author", lang === "ar" ? "التقييم" : "Rating", lang === "ar" ? "الحالة" : "Status"].map((h, i) => (
+                        <th key={i} style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11.5, fontWeight: 500, textAlign: lang === "ar" ? "right" : "left", paddingBottom: 8 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {books.slice(0, 6).map((b) => (
+                      <tr key={b.id} onClick={() => setOpenBook(b)} className="cursor-pointer" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <td style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 12.5, padding: "9px 0" }}>{b.title}</td>
+                        <td style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>{b.author}</td>
+                        <td><StarRow value={b.rating || 0} size={11} /></td>
+                        <td style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 11.5 }}>
+                          {b.status === "finished" ? t.finished : b.status === "reading" ? t.currentlyReading : t.wantToRead}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <QuoteIcon size={14} color="#FFB199" />
+                  <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 14 }}>{t.quotes}</h3>
+                </div>
+                <div className="space-y-4">
+                  {QUOTES.slice(0, 2).map((q, i) => (
+                    <div key={i}>
+                      <p style={{ fontFamily: "Amiri, serif", color: "#F4F0FF", fontSize: 14.5, lineHeight: 1.6 }}>“{q[lang]}”</p>
+                      <p style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11, marginTop: 4 }}>— {q.by}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-6 mb-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+              <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.weeklyActivity}</h3>
+              <div className="flex items-end justify-between gap-2 mb-3" style={{ height: 110 }}>
+                {weekData.map((d, i) => (
+                  <div key={i} className="flex flex-col items-center gap-2 flex-1">
+                    <div className="w-full rounded-t-lg" style={{ height: `${(d.v / maxWeek) * 100}%`, minHeight: 4, background: "linear-gradient(180deg,#FFB199,#A78BFA)" }} />
+                    <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11 }}>{d.day}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                {weekData.map((d, i) => {
+                  const intensity = d.v / maxWeek;
+                  return (
+                    <div key={i} className="flex-1 rounded-md" style={{
+                      height: 14,
+                      background: intensity === 0 ? "rgba(255,255,255,0.06)" : `rgba(255,178,153,${0.25 + intensity * 0.65})`,
+                    }} title={`${d.v} ${lang === "ar" ? "دقيقة" : "min"}`} />
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+              <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>{t.topGenres}</h3>
+              <div className="space-y-3">
+                {genreCounts.map(([g, count], i) => (
+                  <div key={g}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 13 }}>{GENRES[lang][g]}</span>
+                      <span style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12 }}>{count} {t.booksRead}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
+                      <div className="h-1.5 rounded-full" style={{ width: `${(count / books.length) * 100}%`, background: SPINE_COLORS[i % SPINE_COLORS.length] }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl p-6 mt-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
+              <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>{t.achievements}</h3>
+              <div className="flex flex-wrap gap-3">
+                {[
+                  { icon: Flame, label: lang === "ar" ? "٧ أيام متتالية" : "7-Day Streak" },
+                  { icon: BookMarked, label: lang === "ar" ? "أول كتاب" : "First Book" },
+                  { icon: Star, label: lang === "ar" ? "قارئ مجتهد" : "Avid Reader" },
+                  { icon: TrendingUp, label: lang === "ar" ? "١٠٠ ألف كلمة" : "100k Words" },
+                ].map((a, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3.5 py-2 rounded-full" style={{ background: "#211C3D", border: "1px solid rgba(255,255,255,0.14)" }}>
+                    <a.icon size={14} color="#FFB199" />
+                    <span style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontSize: 12.5 }}>{a.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      {showAdd && <AddBookModal t={t} lang={lang} onClose={() => setShowAdd(false)} onAdd={addBook} />}
+      {showAdd && (
+        <AddBookModal
+          t={t}
+          lang={lang}
+          onClose={() => setShowAdd(false)}
+          onAdd={addBook}
+        />
+      )}
     </div>
+  );
+}
+
+function NavBtn({ icon: Icon, label, active, onClick }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-1.5 px-4 py-2 rounded-full transition-colors"
+      style={{ background: active ? "linear-gradient(180deg,#FFB199,#A78BFA)" : "transparent", color: active ? "#241F45" : "#B6ACD6", fontFamily: "Tajawal", fontWeight: active ? 700 : 500, fontSize: 13.5 }}>
+      <Icon size={15} /> {label}
+    </button>
   );
 }
 
 function ShelfRow({ label, books, t, lang, onOpen }) {
   return (
-    <div className="mb-12">
-      <h3 className="text-sm font-bold text-[#FFB199] mb-4">{label}</h3>
-      <div className="relative pb-6">
-        <div className="flex gap-6 overflow-x-auto pb-4 px-2 pt-2">
+    <div className="mb-10">
+      <h3 style={{ fontFamily: "Tajawal", color: "#FFB199", fontSize: 13, fontWeight: 700, marginBottom: 14, letterSpacing: 0.5 }}>{label}</h3>
+      <div className="relative pb-5">
+        <div className="flex gap-4 overflow-x-auto pb-3 px-1" style={{ scrollbarWidth: "thin" }}>
           {books.map((b) => (
-            <div key={b.id} className="shrink-0">
-              <BookSpine book={b} t={t} lang={lang} onOpen={onOpen} />
+            <div key={b.id} className="shrink-0" style={{ width: 116 }}>
+              <BookSpine book={b} t={t} lang={lang} onOpen={onOpen} compact />
             </div>
           ))}
         </div>
-        <div className="absolute left-0 right-0 bottom-1 rounded-sm shadow-xl" style={{
-          height: 14, background: "linear-gradient(180deg, #dfb482 0%, #b58552 40%, #7d562f 100%)", borderTop: "1px solid rgba(255,255,255,0.3)"
+        <div className="absolute left-0 right-0 bottom-0 rounded-full" style={{
+          height: 10,
+          background: "linear-gradient(180deg, #C9A06B 0%, #8B6A42 60%, #5E4429 100%)",
+          boxShadow: "0 8px 14px -4px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.25) inset",
         }} />
-      </div>
-    </div>
-  );
-}
-
-function AuthScreen({ t, lang, onAuth, onToggleLang }) {
-  const [form, setForm] = useState({ email: "", password: "" });
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#130f21] p-4">
-      <div className="w-full max-w-sm p-6 rounded-2xl bg-white bg-opacity-5 border border-white border-opacity-10 text-center">
-        <h2 style={{ fontFamily: "Amiri", fontSize: 24 }} className="mb-4 text-[#FFB199]">{t.appName}</h2>
-        <Field label={t.email} value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
-        <Field label={t.password} value={form.password} onChange={(v) => setForm({ ...form, password: v })} type="password" />
-        <button onClick={() => onAuth("signin", form)} className="w-full py-2.5 mt-2 rounded-xl text-xs font-bold bg-gradient-to-r from-[#FFB199] to-[#A78BFA] text-[#161224]">{t.signIn}</button>
       </div>
     </div>
   );
