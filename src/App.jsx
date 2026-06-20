@@ -11,15 +11,11 @@ import {
   Quote as QuoteIcon, Award, Upload, AlertCircle
 } from "lucide-react";
 
-// ----------------------------------------------------------------
-// Supabase connection (real backend — Postgres + Auth)
-// ----------------------------------------------------------------
-
-  BookOpen, Bookmark, Highlighter, Sticker, Flame, Clock, BookMarked,
-  Sparkles, User, LogIn, UserPlus, X, ChevronLeft, ChevronRight,
-  Globe, LayoutDashboard, Library, Plus, Search, Star, TrendingUp,
-  Quote as QuoteIcon, Award, Upload, AlertCircle
-} from "lucide-react";
+const FONT_IMPORTS = `
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700&display=swap');
+* { box-sizing: border-box; }
+body { margin: 0; }
+`;
 
 // ----------------------------------------------------------------
 // Supabase connection (real backend — Postgres + Auth)
@@ -27,8 +23,6 @@ import {
 const SUPABASE_URL = "https://abpgyqyghhydinhfuzgt.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFicGd5cXlnaGh5ZGluaGZ1emd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDg0OTYsImV4cCI6MjA5NzM4NDQ5Nn0.ANO_WnOLNi2PuxXBZsTAlsqAUnYhMRCCfoRml5FWcSI";
 
-// Minimal Supabase client built on fetch — no extra packages required,
-// so this code runs as-is here AND after you `npm install` it for real.
 const sb = {
   async signUp(email, password, name) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
@@ -38,7 +32,7 @@ const sb = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.msg || data.error_description || data.error || "Sign up failed");
-    return data; // { access_token, user, ... } (access_token may be null if email confirmation is required)
+    return data;
   },
   async signIn(email, password) {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -48,7 +42,7 @@ const sb = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error_description || data.msg || "Sign in failed");
-    return data; // { access_token, user, ... }
+    return data;
   },
   async listBooks(token) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/books?select=*&order=created_at.asc`, {
@@ -87,39 +81,8 @@ const sb = {
   },
 };
 
-/* ============================================================
-   كهف الكتب — Kahf Al-Kutub ("The Cave of Books")
-   A bilingual (AR/EN) personal reading-tracker.
-
-   DESIGN CONCEPT
-   ---------------------------------------------------------------
-   Subject: a private cave-library lit by lanterns — shelves carved
-   into stone, parchment, amber lamplight, the hush of reading at
-   night. The "cave" is the antidote to the noisy feed: a quiet,
-   warm, personal place to keep your books.
-
-   Palette
-     --stone-950 #211C3D  deep cave stone (app background)
-     --stone-800 rgba(255,255,255,0.08)  shelf wood/stone panels
-     --parchment #F4F0FF  page / card surface
-     --ember     #A78BFA  warm accent (progress, CTAs)
-     --gold      #FFB199  lantern glow (highlights, stars)
-     --moss      #7C8CFF  secondary accent (tags, success)
-
-   Type
-     Display: "Amiri" (serif, supports Arabic + Latin, carved-stone feel)
-     Body:    "Tajawal" (humanist sans, excellent AR+EN harmony)
-     Mono/UI: "Tajawal" tabular numerals for stats
-
-   Layout signature
-     The hero is a literal carved stone arch revealing a shelf of
-     glowing spines. Library = wooden shelf rows instead of a grid
-     of cover-cards. A hanging lantern card on the right holds the
-     "Reader of the Week" + daily quote, swaying gently.
-   =============================================================== */
-
 // ---------------------------------------------------------------
-// i18n
+// i18n & Static Data
 // ---------------------------------------------------------------
 const STR = {
   en: {
@@ -629,7 +592,7 @@ const STICKERS = ["⭐", "🔖", "❤️", "🪶", "🕯️"];
 const HL_COLORS = ["#FFB19988", "#A78BFA66", "#7C8CFF77", "#F472B666"];
 
 function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdateBookmark }) {
-  const [tool, setTool] = useState(null); // 'pen' | 'sticker' | 'bookmark'
+  const [tool, setTool] = useState(null);
   const [hlColor, setHlColor] = useState(HL_COLORS[0]);
   const [highlights, setHighlights] = useState([]);
   const [stickers, setStickers] = useState([]);
@@ -648,12 +611,11 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdat
       sel.removeAllRanges();
     }
   };
-  // Touch selection on mobile needs a brief delay before the selection is final.
   const handleTouchEnd = () => setTimeout(captureHighlight, 60);
 
   const handlePageClick = (e) => {
     if (tool !== "sticker") return;
-    if (e.target.closest("[data-sticker]")) return; // tapping an existing sticker is handled separately
+    if (e.target.closest("[data-sticker]")) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -688,13 +650,12 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdat
             <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 13 }}>{t.page} {book.page} {t.of} {book.totalPages}</p>
           </div>
           {bookmarkPage != null && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: justBookmarked ? "#FFB19944" : "#A78BFA22", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12, transition: "background 0.3s" }}>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: justBookmarked ? "#FFB19944" : "#A78BFA33", color: "#FFB199", fontFamily: "Tajawal", fontSize: 12, transition: "background 0.3s" }}>
               <Bookmark size={13} /> {t.bookmarkSet} {bookmarkPage}
             </div>
           )}
         </div>
 
-        {/* Toolbar */}
         <div className="flex items-center gap-2 mb-4 p-2 rounded-2xl flex-wrap" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
           <ToolBtn icon={Highlighter} active={tool === "pen"} label={t.pen} onClick={() => setTool(tool === "pen" ? null : "pen")} />
           <ToolBtn icon={Sticker} active={tool === "sticker"} label={t.sticker} onClick={() => setTool(tool === "sticker" ? null : "sticker")} />
@@ -708,18 +669,7 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdat
             </div>
           )}
         </div>
-        {tool === "pen" && (
-          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11.5, marginBottom: 8 }}>
-            {lang === "ar" ? "اسحب إصبعك فوق النص لتحديده." : "Drag your finger over the text to select it."}
-          </p>
-        )}
-        {tool === "sticker" && (
-          <p style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 11.5, marginBottom: 8 }}>
-            {lang === "ar" ? "اضغط على الصفحة لإضافة ستيكر، واضغط على ستيكر موجود لحذفه." : "Tap the page to place a sticker, tap a sticker to remove it."}
-          </p>
-        )}
 
-        {/* Page */}
         <div
           ref={containerRef}
           onMouseUp={captureHighlight}
@@ -752,7 +702,6 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdat
           </div>
         )}
 
-        {/* page nav */}
         <div className="flex items-center justify-between mt-6">
           <button
             disabled={atFirstPage}
@@ -770,7 +719,6 @@ function ReaderView({ book, t, lang, onBack, onUpdatePage, onUpdateMeta, onUpdat
           </button>
         </div>
 
-        {/* Rating & review — appears right under the book */}
         <div className="mt-8 rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
           <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
             {lang === "ar" ? "تقييمي للكتاب" : "My rating"}
@@ -813,8 +761,6 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
   const [uploadError, setUploadError] = useState("");
   const fileRef = useRef(null);
 
-  // Renders page 1 of a PDF onto a canvas and returns a data-URL image —
-  // this becomes the book's real cover, taken straight from the file.
   const coverFromPdf = async (file) => {
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
@@ -827,9 +773,6 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
     return { cover: canvas.toDataURL("image/jpeg", 0.9), totalPages: pdf.numPages };
   };
 
-  // EPUBs don't expose a page to render the same way — instead we paint a
-  // clean generated cover using the book's own title, so it's still unique
-  // to that file rather than a generic placeholder.
   const coverFromTitle = (title, color) => {
     const canvas = document.createElement("canvas");
     canvas.width = 400; canvas.height = 560;
@@ -837,7 +780,7 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
     const grad = ctx.createLinearGradient(0, 0, 400, 560);
     grad.addColorStop(0, color); grad.addColorStop(1, "#241F45");
     ctx.fillStyle = grad; ctx.fillRect(0, 0, 400, 560);
-    ctx.fillStyle = "#F4F0FF"; ctx.font = "bold 32px Georgia, serif"; ctx.textAlign = "center";
+    ctx.fillStyle = "#F4F0FF"; ctx.font = "bold 32px 'Amiri', serif"; ctx.textAlign = "center";
     const words = (title || "Book").split(" ");
     let line = "", y = 250, lines = [];
     words.forEach((w) => {
@@ -881,7 +824,6 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
           <button onClick={onClose}><X size={18} color="#B6ACD6" /></button>
         </div>
 
-        {/* Upload the actual book — cover is generated automatically */}
         <div className="mb-4">
           <label style={{ fontFamily: "Tajawal", color: "#B6ACD6", fontSize: 12.5, display: "block", marginBottom: 5 }}>{t.uploadBook}</label>
           <input ref={fileRef} type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" className="hidden" onChange={(e) => handleBookFile(e.target.files?.[0])} />
@@ -953,9 +895,8 @@ function AddBookModal({ t, lang, onClose, onAdd }) {
 }
 
 // ---------------------------------------------------------------
-// Main App
+// Main App Component
 // ---------------------------------------------------------------
-// Map between DB rows (snake_case) and the app's book shape (camelCase)
 const rowToBook = (r) => ({
   id: r.id, title: r.title, author: r.author || "", genre: r.genre,
   totalPages: r.total_pages, page: r.page, status: r.status, color: r.color,
@@ -972,24 +913,21 @@ const bookToInsertRow = (b) => ({
 export default function KahfAlKutub() {
   const [lang, setLang] = useState("ar");
   const t = STR[lang];
-  const [user, setUser] = useState(null);     // { name, email }
-  const [token, setToken] = useState(null);   // Supabase access_token
-  const [authLoading, setAuthLoading] = useState(false);
-  const [view, setView] = useState("library"); // library | dashboard
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [view, setView] = useState("library");
   const [books, setBooks] = useState([]);
   const [openBook, setOpenBook] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
-  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
+  const [saveState, setSaveState] = useState("idle");
 
-  // --- Auth: sign in or sign up against the real Supabase backend ------
   const handleAuth = async (mode, form) => {
     const data = mode === "signup"
       ? await sb.signUp(form.email, form.password, form.name)
       : await sb.signIn(form.email, form.password);
 
     if (!data.access_token) {
-      // Supabase project has "confirm email" turned on — no session yet.
       throw new Error(lang === "ar"
         ? "تم إنشاء الحساب. تحقق من بريدك الإلكتروني لتأكيده ثم سجّل الدخول."
         : "Account created. Check your email to confirm it, then sign in.");
@@ -998,7 +936,6 @@ export default function KahfAlKutub() {
     setToken(data.access_token);
     setUser({ name: data.user?.user_metadata?.name || form.email.split("@")[0], email: data.user?.email });
 
-    // Load this user's shelf; if empty (new account), seed a starter shelf.
     let rows = await sb.listBooks(data.access_token);
     if (rows.length === 0) {
       const starter = seedBooks(lang).map(bookToInsertRow);
@@ -1013,7 +950,6 @@ export default function KahfAlKutub() {
     setBooks([]);
   };
 
-  // --- Persist a single book change (page turn, add, status) to Postgres
   const persistBook = async (id, patch) => {
     if (!token) return;
     setSaveState("saving");
@@ -1054,17 +990,20 @@ export default function KahfAlKutub() {
   const totalHours = useMemo(() => Math.round(books.reduce((a, b) => a + b.sessions.reduce((x, y) => x + y, 0), 0) / 60 * 10) / 10, [books]);
   const finishedCount = books.filter((b) => b.status === "finished").length;
   const totalWords = books.reduce((a, b) => a + (b.status === "finished" ? b.words : Math.round(b.words * (b.page / (b.totalPages || 1)))), 0);
+  
   const genreCounts = useMemo(() => {
     const m = {};
     books.forEach((b) => { m[b.genre] = (m[b.genre] || 0) + 1; });
     return Object.entries(m).sort((a, b) => b[1] - a[1]);
   }, [books]);
+
   const weekData = useMemo(() => {
     const days = lang === "ar" ? ["س", "ح", "ن", "ث", "ر", "خ", "ج"] : ["S", "S", "M", "T", "W", "T", "F"];
     const totals = [0,0,0,0,0,0,0];
     books.forEach((b) => b.sessions.forEach((m, i) => totals[i] += m));
     return totals.map((v, i) => ({ day: days[i], v }));
   }, [books, lang]);
+  
   const maxWeek = Math.max(...weekData.map((d) => d.v), 1);
 
   const filteredBooks = books.filter((b) => b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase()));
@@ -1219,7 +1158,6 @@ export default function KahfAlKutub() {
               <StatCard icon={Flame} label={t.streak} value={9} sub={lang === "ar" ? "أيام متتالية" : "consecutive days"} />
             </div>
 
-            {/* Currently reading gallery + goal donut */}
             <div className="grid lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
                 <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.currentlyReading}</h3>
@@ -1257,7 +1195,6 @@ export default function KahfAlKutub() {
               </div>
             </div>
 
-            {/* Reading log + favorite quotes */}
             <div className="grid lg:grid-cols-3 gap-6 mb-6">
               <div className="lg:col-span-2 rounded-2xl p-6 overflow-x-auto" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
                 <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 14 }}>
@@ -1266,7 +1203,7 @@ export default function KahfAlKutub() {
                 <table className="w-full" style={{ borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
-                      {[t.title, t.author === "by" || t.author === "بقلم" ? (lang === "ar" ? "المؤلف" : "Author") : t.author, lang === "ar" ? "التقييم" : "Rating", lang === "ar" ? "الحالة" : "Status"].map((h, i) => (
+                      {[t.title, lang === "ar" ? "المؤلف" : "Author", lang === "ar" ? "التقييم" : "Rating", lang === "ar" ? "الحالة" : "Status"].map((h, i) => (
                         <th key={i} style={{ fontFamily: "Tajawal", color: "#8D81B5", fontSize: 11.5, fontWeight: 500, textAlign: lang === "ar" ? "right" : "left", paddingBottom: 8 }}>{h}</th>
                       ))}
                     </tr>
@@ -1302,7 +1239,6 @@ export default function KahfAlKutub() {
               </div>
             </div>
 
-            {/* Reading tracker heatmap */}
             <div className="rounded-2xl p-6 mb-6" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.14)", backdropFilter: "blur(14px)" }}>
               <h3 style={{ fontFamily: "Tajawal", color: "#F4F0FF", fontWeight: 700, fontSize: 16, marginBottom: 16 }}>{t.weeklyActivity}</h3>
               <div className="flex items-end justify-between gap-2 mb-3" style={{ height: 110 }}>
@@ -1396,7 +1332,6 @@ function ShelfRow({ label, books, t, lang, onOpen }) {
             </div>
           ))}
         </div>
-        {/* wooden shelf ledge */}
         <div className="absolute left-0 right-0 bottom-0 rounded-full" style={{
           height: 10,
           background: "linear-gradient(180deg, #C9A06B 0%, #8B6A42 60%, #5E4429 100%)",
@@ -1406,9 +1341,3 @@ function ShelfRow({ label, books, t, lang, onOpen }) {
     </div>
   );
 }
-
-const FONT_IMPORTS = `
-@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700&display=swap');
-* { box-sizing: border-box; }
-body { margin: 0; }
-`;
